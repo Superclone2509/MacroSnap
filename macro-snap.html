@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MacroSnap">
+<title>MacroSnap</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --accent: #22d3ee;
+    --accent2: #a78bfa;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --red: #f87171;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh; padding: 0 16px 100px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  .header { text-align: center; padding: 20px 0 12px; }
+  .header h1 { font-size: 24px; font-weight: 700; }
+  .header h1 span { color: var(--accent); }
+  .header p { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  /* API key setup */
+  .setup { background: var(--surface); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .setup label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 8px; }
+  .setup input {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface2);
+    background: var(--bg); color: var(--text); font-size: 15px; outline: none;
+  }
+  .setup input:focus { border-color: var(--accent); }
+  .setup .hint { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.4; }
+  .setup .hint a { color: var(--accent); }
+
+  /* Camera button */
+  .capture-area { text-align: center; margin: 16px 0; }
+  .capture-btn {
+    width: 100%; padding: 16px; border-radius: var(--radius);
+    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+    color: white; font-size: 17px; font-weight: 600; border: none;
+    cursor: pointer; position: relative; overflow: hidden;
+  }
+  .capture-btn:active { opacity: 0.85; transform: scale(0.98); }
+  .capture-btn.loading { opacity: 0.7; pointer-events: none; }
+  input[type="file"] { display: none; }
+
+  /* Preview */
+  .preview-container { margin: 16px 0; display: none; }
+  .preview-container.visible { display: block; }
+  .preview-container img {
+    width: 100%; border-radius: var(--radius); max-height: 300px; object-fit: cover;
+  }
+
+  /* Results card */
+  .results { display: none; margin: 16px 0; }
+  .results.visible { display: block; }
+  .results-card {
+    background: var(--surface); border-radius: var(--radius); padding: 20px;
+  }
+  .meal-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .meal-desc { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.4; }
+  .calories-row {
+    text-align: center; padding: 16px 0; margin-bottom: 16px;
+    background: var(--bg); border-radius: 12px;
+  }
+  .calories-num { font-size: 42px; font-weight: 800; color: var(--accent); }
+  .calories-label { font-size: 13px; color: var(--text2); }
+  .macros-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .macro-item {
+    text-align: center; padding: 14px 8px; border-radius: 12px; background: var(--bg);
+  }
+  .macro-value { font-size: 24px; font-weight: 700; }
+  .macro-label { font-size: 11px; color: var(--text2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .macro-item.carbs .macro-value { color: var(--orange); }
+  .macro-item.protein .macro-value { color: var(--green); }
+  .macro-item.fat .macro-value { color: var(--accent2); }
+
+  /* Confidence */
+  .confidence { margin-top: 12px; font-size: 12px; color: var(--text2); text-align: center; }
+
+  /* Items breakdown */
+  .items-list { margin-top: 16px; }
+  .items-list h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text2); }
+  .food-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--surface2);
+  }
+  .food-item:last-child { border-bottom: none; }
+  .food-item-name { font-size: 14px; }
+  .food-item-cals { font-size: 14px; color: var(--text2); }
+
+  /* Log */
+  .log-section { margin-top: 24px; }
+  .log-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+  .log-entry {
+    background: var(--surface); border-radius: 12px; padding: 14px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .log-entry-left { flex: 1; }
+  .log-entry-name { font-size: 15px; font-weight: 600; }
+  .log-entry-time { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .log-entry-right { text-align: right; }
+  .log-entry-cals { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .log-entry-macros { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .log-empty { text-align: center; color: var(--text2); padding: 30px; font-size: 14px; }
+
+  /* Daily total */
+  .daily-total {
+    background: linear-gradient(135deg, rgba(14,165,233,0.15), rgba(139,92,246,0.15));
+    border: 1px solid var(--surface2);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 16px; text-align: center;
+  }
+  .daily-total-label { font-size: 13px; color: var(--text2); }
+  .daily-total-num { font-size: 28px; font-weight: 800; color: var(--accent); }
+  .daily-total-macros { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  /* Clear log */
+  .clear-log {
+    background: none; border: 1px solid var(--surface2); color: var(--text2);
+    padding: 10px 20px; border-radius: 10px; font-size: 13px; cursor: pointer;
+    display: block; margin: 12px auto 0;
+  }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error { background: rgba(248,113,113,0.15); border: 1px solid var(--red); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 14px; color: var(--red); display: none; }
+  .error.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Macro<span>Snap</span></h1>
+  <p>Snap a meal, get the macros</p>
+</div>
+
+<div class="setup" id="setup">
+  <label>Gemini API Key</label>
+  <input type="password" id="apiKey" placeholder="Paste your API key here" autocomplete="off">
+  <div class="hint">
+    Free from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
+    Your key stays on this device only.
+  </div>
+</div>
+
+<div class="capture-area">
+  <button class="capture-btn" id="captureBtn" onclick="document.getElementById('fileInput').click()">
+    📸 Snap or Upload a Meal
+  </button>
+  <input type="file" id="fileInput" accept="image/*" capture="environment">
+</div>
+
+<div class="preview-container" id="preview">
+  <img id="previewImg" alt="Meal preview">
+</div>
+
+<div class="error" id="error"></div>
+
+<div class="results" id="results">
+  <div class="results-card">
+    <div class="meal-name" id="mealName"></div>
+    <div class="meal-desc" id="mealDesc"></div>
+    <div class="calories-row">
+      <div class="calories-num" id="totalCals">0</div>
+      <div class="calories-label">calories</div>
+    </div>
+    <div class="macros-grid">
+      <div class="macro-item carbs">
+        <div class="macro-value" id="carbsVal">0g</div>
+        <div class="macro-label">Carbs</div>
+      </div>
+      <div class="macro-item protein">
+        <div class="macro-value" id="proteinVal">0g</div>
+        <div class="macro-label">Protein</div>
+      </div>
+      <div class="macro-item fat">
+        <div class="macro-value" id="fatVal">0g</div>
+        <div class="macro-label">Fat</div>
+      </div>
+    </div>
+    <div class="items-list" id="itemsList"></div>
+    <div class="confidence" id="confidence"></div>
+  </div>
+</div>
+
+<div class="log-section" id="logSection">
+  <h2>Today's Log</h2>
+  <div class="daily-total" id="dailyTotal" style="display:none;">
+    <div class="daily-total-label">Daily Total</div>
+    <div class="daily-total-num" id="dailyTotalCals">0</div>
+    <div class="daily-total-macros" id="dailyTotalMacros"></div>
+  </div>
+  <div id="logEntries"><div class="log-empty">No meals logged yet today</div></div>
+  <button class="clear-log" id="clearLogBtn" style="display:none;" onclick="clearLog()">Clear Today's Log</button>
+</div>
+
+<script>
+const MODEL = 'gemini-3.1-flash';
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
+const PROMPT = `You are a nutrition analyst. Analyze this meal photo and estimate the macronutrients.
+
+Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
+{
+  "meal_name": "Short descriptive name",
+  "description": "Brief description of what you see",
+  "calories": 500,
+  "carbs_g": 60,
+  "protein_g": 30,
+  "fat_g": 15,
+  "confidence": "medium",
+  "items": [
+    {"name": "Item 1", "calories": 250},
+    {"name": "Item 2", "calories": 250}
+  ]
+}
+
+Rules:
+- Estimate portions based on typical serving sizes and visual cues (plate size, utensils for scale)
+- "confidence" must be "high", "medium", or "low"
+- Break down individual items when possible
+- If you cannot identify food in the image, return: {"error": "Could not identify food in this image"}
+- All numbers should be integers`;
+
+// Load saved API key
+const apiKeyInput = document.getElementById('apiKey');
+apiKeyInput.value = localStorage.getItem('macrosnap_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('macrosnap_key', apiKeyInput.value.trim());
+});
+
+// File input handler
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    showError('Please enter your Gemini API key first.');
+    return;
+  }
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const base64Full = ev.target.result;
+    const base64Data = base64Full.split(',')[1];
+    const mimeType = file.type || 'image/jpeg';
+
+    document.getElementById('previewImg').src = base64Full;
+    document.getElementById('preview').classList.add('visible');
+    document.getElementById('results').classList.remove('visible');
+    hideError();
+
+    await analyzeImage(base64Data, mimeType, key);
+  };
+  reader.readAsDataURL(file);
+
+  // Reset so same file can be re-selected
+  e.target.value = '';
+});
+
+async function analyzeImage(base64Data, mimeType, apiKey) {
+  const btn = document.getElementById('captureBtn');
+  btn.classList.add('loading');
+  btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+  try {
+    const res = await fetch(`${API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mimeType, data: base64Data } },
+            { text: PROMPT }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err?.error?.message || `API error ${res.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('No response from Gemini');
+
+    // Clean potential markdown fences
+    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const result = JSON.parse(cleaned);
+
+    if (result.error) {
+      showError(result.error);
+      return;
+    }
+
+    displayResults(result);
+    addToLog(result);
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.classList.remove('loading');
+    btn.innerHTML = '📸 Snap or Upload a Meal';
+  }
+}
+
+function displayResults(r) {
+  document.getElementById('mealName').textContent = r.meal_name;
+  document.getElementById('mealDesc').textContent = r.description;
+  document.getElementById('totalCals').textContent = r.calories;
+  document.getElementById('carbsVal').textContent = r.carbs_g + 'g';
+  document.getElementById('proteinVal').textContent = r.protein_g + 'g';
+  document.getElementById('fatVal').textContent = r.fat_g + 'g';
+
+  // Confidence
+  const confMap = { high: '🟢 High confidence', medium: '🟡 Medium confidence', low: '🔴 Low confidence' };
+  document.getElementById('confidence').textContent = confMap[r.confidence] || '';
+
+  // Items breakdown
+  const list = document.getElementById('itemsList');
+  if (r.items && r.items.length > 0) {
+    list.innerHTML = '<h3>Breakdown</h3>' + r.items.map(i =>
+      `<div class="food-item"><span class="food-item-name">${i.name}</span><span class="food-item-cals">${i.calories} cal</span></div>`
+    ).join('');
+  } else {
+    list.innerHTML = '';
+  }
+
+  document.getElementById('results').classList.add('visible');
+}
+
+// --- Food Log (localStorage, per-day) ---
+function getTodayKey() {
+  return 'macrosnap_log_' + new Date().toISOString().slice(0, 10);
+}
+
+function getLog() {
+  try { return JSON.parse(localStorage.getItem(getTodayKey())) || []; }
+  catch { return []; }
+}
+
+function saveLog(log) {
+  localStorage.setItem(getTodayKey(), JSON.stringify(log));
+}
+
+function addToLog(result) {
+  const log = getLog();
+  log.push({
+    name: result.meal_name,
+    calories: result.calories,
+    carbs: result.carbs_g,
+    protein: result.protein_g,
+    fat: result.fat_g,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
+  saveLog(log);
+  renderLog();
+}
+
+function renderLog() {
+  const log = getLog();
+  const container = document.getElementById('logEntries');
+  const totalEl = document.getElementById('dailyTotal');
+  const clearBtn = document.getElementById('clearLogBtn');
+
+  if (log.length === 0) {
+    container.innerHTML = '<div class="log-empty">No meals logged yet today</div>';
+    totalEl.style.display = 'none';
+    clearBtn.style.display = 'none';
+    return;
+  }
+
+  let tCal = 0, tCarb = 0, tPro = 0, tFat = 0;
+  container.innerHTML = log.map(e => {
+    tCal += e.calories; tCarb += e.carbs; tPro += e.protein; tFat += e.fat;
+    return `<div class="log-entry">
+      <div class="log-entry-left">
+        <div class="log-entry-name">${e.name}</div>
+        <div class="log-entry-time">${e.time}</div>
+      </div>
+      <div class="log-entry-right">
+        <div class="log-entry-cals">${e.calories}</div>
+        <div class="log-entry-macros">C${e.carbs}g · P${e.protein}g · F${e.fat}g</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('dailyTotalCals').textContent = tCal;
+  document.getElementById('dailyTotalMacros').textContent = `C ${tCarb}g · P ${tPro}g · F ${tFat}g`;
+  totalEl.style.display = 'block';
+  clearBtn.style.display = 'block';
+}
+
+function clearLog() {
+  if (confirm('Clear today\'s log?')) {
+    localStorage.removeItem(getTodayKey());
+    renderLog();
+  }
+}
+
+function showError(msg) { const el = document.getElementById('error'); el.textContent = msg; el.classList.add('visible'); }
+function hideError() { document.getElementById('error').classList.remove('visible'); }
+
+// Render log on load
+renderLog();
+</script>
+</body>
+</html>
