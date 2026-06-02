@@ -418,14 +418,8 @@ function displayResults(r) {
 function logToHealth() {
   if (!lastResult) return;
   const r = lastResult;
-  // Encode data as JSON and pass via shortcuts:// URL scheme
-  const data = JSON.stringify({
-    calories: r.calories,
-    carbs: r.carbs_g,
-    protein: r.protein_g,
-    fat: r.fat_g,
-    name: r.meal_name
-  });
+  // Pass as simple pipe-delimited string: calories|protein|carbs|fat|name
+  const data = `${r.calories}|${r.protein_g}|${r.carbs_g}|${r.fat_g}|${r.meal_name}`;
   const encoded = encodeURIComponent(data);
   const url = `shortcuts://run-shortcut?name=MacroSnap%20Log&input=text&text=${encoded}`;
 
