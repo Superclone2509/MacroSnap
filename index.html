@@ -43,8 +43,24 @@
     background: var(--bg); color: var(--text); font-size: 15px; outline: none;
   }
   .setup input:focus { border-color: var(--accent); }
+  .setup select {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface2);
+    background: var(--bg); color: var(--text); font-size: 15px; outline: none;
+    margin-top: 10px; -webkit-appearance: none; appearance: none;
+  }
+  .setup select:focus { border-color: var(--accent); }
   .setup .hint { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.4; }
   .setup .hint a { color: var(--accent); }
+
+  /* Description input */
+  .desc-area { margin-bottom: 16px; }
+  .desc-area textarea {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface2);
+    background: var(--surface); color: var(--text); font-size: 14px; outline: none;
+    resize: none; font-family: inherit; min-height: 44px; max-height: 120px;
+  }
+  .desc-area textarea::placeholder { color: var(--text2); }
+  .desc-area textarea:focus { border-color: var(--accent); }
 
   /* Camera button */
   .capture-area { text-align: center; margin: 16px 0; }
@@ -154,10 +170,20 @@
 <div class="setup" id="setup">
   <label>Gemini API Key</label>
   <input type="password" id="apiKey" placeholder="Paste your API key here" autocomplete="off">
+  <label style="margin-top:12px;">Model</label>
+  <select id="modelSelect">
+    <option value="gemini-2.5-flash">Gemini 2.5 Flash (recommended)</option>
+    <option value="gemini-3.5-flash">Gemini 3.5 Flash (newest)</option>
+    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (fastest)</option>
+  </select>
   <div class="hint">
     Free from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
     Your key stays on this device only.
   </div>
+</div>
+
+<div class="desc-area">
+  <textarea id="foodDesc" rows="2" placeholder="Optional: describe the meal (e.g. &quot;grilled chicken with rice, about 6oz chicken&quot;)"></textarea>
 </div>
 
 <div class="capture-area">
@@ -212,10 +238,17 @@
 </div>
 
 <script>
-const MODEL = 'gemini-3.1-flash';
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+function getApiUrl() {
+  const model = document.getElementById('modelSelect').value;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
-const PROMPT = `You are a nutrition analyst. Analyze this meal photo and estimate the macronutrients.
+function buildPrompt(userDesc) {
+  let extra = '';
+  if (userDesc) {
+    extra = `\n\nThe user describes this meal as: "${userDesc}"\nUse this description to improve your identification and portion estimates. The description takes priority over visual guesses when there is ambiguity.`;
+  }
+  return `You are a nutrition analyst. Analyze this meal photo and estimate the macronutrients.${extra}
 
 Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
 {
@@ -238,12 +271,20 @@ Rules:
 - Break down individual items when possible
 - If you cannot identify food in the image, return: {"error": "Could not identify food in this image"}
 - All numbers should be integers`;
+}
 
 // Load saved API key
 const apiKeyInput = document.getElementById('apiKey');
 apiKeyInput.value = localStorage.getItem('macrosnap_key') || '';
 apiKeyInput.addEventListener('change', () => {
   localStorage.setItem('macrosnap_key', apiKeyInput.value.trim());
+});
+
+// Load/save model selection
+const modelSelect = document.getElementById('modelSelect');
+modelSelect.value = localStorage.getItem('macrosnap_model') || 'gemini-2.5-flash';
+modelSelect.addEventListener('change', () => {
+  localStorage.setItem('macrosnap_model', modelSelect.value);
 });
 
 // File input handler
@@ -269,7 +310,8 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     document.getElementById('results').classList.remove('visible');
     hideError();
 
-    await analyzeImage(base64Data, mimeType, key);
+    const desc = document.getElementById('foodDesc').value.trim();
+    await analyzeImage(base64Data, mimeType, key, desc);
   };
   reader.readAsDataURL(file);
 
@@ -277,20 +319,20 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 
-async function analyzeImage(base64Data, mimeType, apiKey) {
+async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
   const btn = document.getElementById('captureBtn');
   btn.classList.add('loading');
   btn.innerHTML = '<span class="spinner"></span>Analyzing...';
 
   try {
-    const res = await fetch(`${API_URL}?key=${apiKey}`, {
+    const res = await fetch(`${getApiUrl()}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [
             { inline_data: { mime_type: mimeType, data: base64Data } },
-            { text: PROMPT }
+            { text: buildPrompt(userDesc) }
           ]
         }],
         generationConfig: {
