@@ -144,6 +144,15 @@
   .daily-total-num { font-size: 28px; font-weight: 800; color: var(--accent); }
   .daily-total-macros { font-size: 13px; color: var(--text2); margin-top: 4px; }
 
+  /* Health button */
+  .health-btn {
+    width: 100%; padding: 14px; border-radius: 12px; margin-top: 14px;
+    background: linear-gradient(135deg, #ff2d55, #ff6b8a);
+    color: white; font-size: 15px; font-weight: 600; border: none; cursor: pointer;
+  }
+  .health-btn:active { opacity: 0.85; transform: scale(0.98); }
+  .health-btn.logged { background: var(--surface2); pointer-events: none; }
+
   /* Clear log */
   .clear-log {
     background: none; border: 1px solid var(--surface2); color: var(--text2);
@@ -223,6 +232,7 @@
     </div>
     <div class="items-list" id="itemsList"></div>
     <div class="confidence" id="confidence"></div>
+    <button class="health-btn" id="healthBtn" onclick="logToHealth()">❤️ Log to Apple Health</button>
   </div>
 </div>
 
@@ -361,6 +371,7 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
       return;
     }
 
+    lastResult = result;
     displayResults(result);
     addToLog(result);
 
@@ -371,6 +382,8 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
     btn.innerHTML = '📸 Snap or Upload a Meal';
   }
 }
+
+let lastResult = null;
 
 function displayResults(r) {
   document.getElementById('mealName').textContent = r.meal_name;
@@ -394,7 +407,34 @@ function displayResults(r) {
     list.innerHTML = '';
   }
 
+  // Reset health button
+  const hb = document.getElementById('healthBtn');
+  hb.classList.remove('logged');
+  hb.textContent = '❤️ Log to Apple Health';
+
   document.getElementById('results').classList.add('visible');
+}
+
+function logToHealth() {
+  if (!lastResult) return;
+  const r = lastResult;
+  // Encode data as JSON and pass via shortcuts:// URL scheme
+  const data = JSON.stringify({
+    calories: r.calories,
+    carbs: r.carbs_g,
+    protein: r.protein_g,
+    fat: r.fat_g,
+    name: r.meal_name
+  });
+  const encoded = encodeURIComponent(data);
+  const url = `shortcuts://run-shortcut?name=MacroSnap%20Log&input=text&text=${encoded}`;
+
+  // Mark button as logged
+  const hb = document.getElementById('healthBtn');
+  hb.classList.add('logged');
+  hb.textContent = '✓ Sent to Shortcut';
+
+  window.location.href = url;
 }
 
 // --- Food Log (localStorage, per-day) ---
