@@ -418,8 +418,9 @@ function displayResults(r) {
 function logToHealth() {
   if (!lastResult) return;
   const r = lastResult;
-  // Pass only numbers, no text — avoids Shortcuts JSON auto-parse issues
-  const data = `${r.calories},${r.protein_g},${r.carbs_g},${r.fat_g}`;
+  // Newline-separated numbers, URL-encoded — split with "New Lines" in the Shortcut
+  // Order: calories, protein, carbs, fat
+  const data = encodeURIComponent(`${r.calories}\n${r.protein_g}\n${r.carbs_g}\n${r.fat_g}`);
   const url = `shortcuts://run-shortcut?name=MacroSnap%20Log&input=text&text=${data}`;
 
   // Mark button as logged
