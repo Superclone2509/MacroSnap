@@ -357,7 +357,7 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
         }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 1024
+          maxOutputTokens: 8192
         }
       })
     });
@@ -369,7 +369,8 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
     }
 
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = parts.filter(p => p.text && !p.thought).map(p => p.text).join('');
     if (!text) throw new Error('No response from Gemini');
 
     // Clean potential markdown fences
