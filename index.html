@@ -72,6 +72,10 @@
   }
   .capture-btn:active { opacity: 0.85; transform: scale(0.98); }
   .capture-btn.loading { opacity: 0.7; pointer-events: none; }
+  .library-btn {
+    margin-top: 10px;
+    background: var(--surface); border: 1px solid var(--surface2);
+  }
   input[type="file"] { display: none; }
 
   /* Preview */
@@ -197,9 +201,13 @@
 
 <div class="capture-area">
   <button class="capture-btn" id="captureBtn" onclick="document.getElementById('fileInput').click()">
-    📸 Snap or Upload a Meal
+    📸 Take a Photo
+  </button>
+  <button class="capture-btn library-btn" id="libraryBtn" onclick="document.getElementById('libraryInput').click()">
+    🖼️ Choose from Camera Roll
   </button>
   <input type="file" id="fileInput" accept="image/*" capture="environment">
+  <input type="file" id="libraryInput" accept="image/*">
 </div>
 
 <div class="preview-container" id="preview">
@@ -297,8 +305,8 @@ modelSelect.addEventListener('change', () => {
   localStorage.setItem('macrosnap_model', modelSelect.value);
 });
 
-// File input handler
-document.getElementById('fileInput').addEventListener('change', async (e) => {
+// File input handler (shared by camera and library inputs)
+async function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -327,7 +335,9 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
 
   // Reset so same file can be re-selected
   e.target.value = '';
-});
+}
+document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+document.getElementById('libraryInput').addEventListener('change', handleFileSelect);
 
 async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
   const btn = document.getElementById('captureBtn');
@@ -379,7 +389,7 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
     showError(err.message);
   } finally {
     btn.classList.remove('loading');
-    btn.innerHTML = '📸 Snap or Upload a Meal';
+    btn.innerHTML = '📸 Take a Photo';
   }
 }
 
@@ -418,9 +428,9 @@ function displayResults(r) {
 function logToHealth() {
   if (!lastResult) return;
   const r = lastResult;
-  // Newline-separated numbers, URL-encoded — split with "New Lines" in the Shortcut
+  // Comma-separated numbers — Shortcut splits by Custom separator ","
   // Order: calories, protein, carbs, fat
-  const data = encodeURIComponent(`${r.calories}\n${r.protein_g}\n${r.carbs_g}\n${r.fat_g}`);
+  const data = `${r.calories},${r.protein_g},${r.carbs_g},${r.fat_g}`;
   const url = `shortcuts://run-shortcut?name=MacroSnap%20Log&input=text&text=${data}`;
 
   // Mark button as logged
