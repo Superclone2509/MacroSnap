@@ -262,6 +262,7 @@
 
 <div class="desc-area">
   <textarea id="foodDesc" rows="2" placeholder="Optional: describe the meal (e.g. &quot;grilled chicken with rice, about 6oz chicken&quot;)"></textarea>
+  <button class="secondary-btn" id="descLogBtn" style="width:100%; margin-top:8px;" onclick="analyzeFromText()">✍️ Log from Description (no photo)</button>
 </div>
 
 <div class="capture-area">
@@ -345,12 +346,18 @@ function getApiUrl() {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 }
 
-function buildPrompt(userDesc) {
-  let extra = '';
-  if (userDesc) {
-    extra = `\n\nThe user describes this meal as: "${userDesc}"\nUse this description to improve your identification and portion estimates. The description takes priority over visual guesses when there is ambiguity.`;
+function buildPrompt(userDesc, hasImage) {
+  let intro;
+  if (hasImage) {
+    let extra = '';
+    if (userDesc) {
+      extra = `\n\nThe user describes this meal as: "${userDesc}"\nUse this description to improve your identification and portion estimates. The description takes priority over visual guesses when there is ambiguity.`;
+    }
+    intro = `You are a nutrition analyst. Analyze this meal photo and estimate the macronutrients.${extra}`;
+  } else {
+    intro = `You are a nutrition analyst. No photo is provided. Estimate the macronutrients from this meal description alone: "${userDesc}"\nUse standard nutrition data for known branded/packaged foods, and typical serving sizes when quantities aren't given.`;
   }
-  return `You are a nutrition analyst. Analyze this meal photo and estimate the macronutrients.${extra}
+  return `${intro}
 
 Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
 {
@@ -369,11 +376,11 @@ Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
 }
 
 Rules:
-- Estimate portions based on typical serving sizes and visual cues (plate size, utensils for scale)
+- Estimate portions based on typical serving sizes and, when a photo is provided, visual cues (plate size, utensils for scale)
 - "confidence" must be "high", "medium", or "low"
 - "fiber_g" is dietary fiber in grams
 - Break down individual items when possible
-- If you cannot identify food in the image, return: {"error": "Could not identify food in this image"}
+- If you cannot identify the food (or the description is too vague), return: {"error": "Could not identify the food"}
 - All numbers should be integers`;
 }
 
@@ -448,7 +455,7 @@ async function handleFileSelect(e) {
     hideError();
 
     const desc = document.getElementById('foodDesc').value.trim();
-    await analyzeImage(base64Data, mimeType, key, desc);
+    await analyzeMeal(base64Data, mimeType, key, desc, document.getElementById('captureBtn'), '📸 Take a Photo');
   };
   reader.readAsDataURL(file);
 
@@ -475,25 +482,24 @@ async function reanalyze() {
   }
   hideError();
   const desc = document.getElementById('foodDesc').value.trim();
-  await analyzeImage(lastImage.data, lastImage.mime, key, desc);
+  await analyzeMeal(lastImage.data, lastImage.mime, key, desc, document.getElementById('captureBtn'), '📸 Take a Photo');
 }
 
-async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
-  const btn = document.getElementById('captureBtn');
+// Works with or without a photo: pass base64Data = null for description-only analysis.
+async function analyzeMeal(base64Data, mimeType, apiKey, userDesc, btn, idleLabel) {
   btn.classList.add('loading');
   btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+  const reqParts = base64Data
+    ? [{ inline_data: { mime_type: mimeType, data: base64Data } }, { text: buildPrompt(userDesc, true) }]
+    : [{ text: buildPrompt(userDesc, false) }];
 
   try {
     const res = await fetch(`${getApiUrl()}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: mimeType, data: base64Data } },
-            { text: buildPrompt(userDesc) }
-          ]
-        }],
+        contents: [{ parts: reqParts }],
         generationConfig: {
           temperature: 0.3,
           maxOutputTokens: 8192
@@ -529,8 +535,27 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
     showError(err.message);
   } finally {
     btn.classList.remove('loading');
-    btn.innerHTML = '📸 Take a Photo';
+    btn.innerHTML = idleLabel;
   }
+}
+
+// Description-only logging (no photo needed)
+async function analyzeFromText() {
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    showError('Please enter your Gemini API key first.');
+    return;
+  }
+  const desc = document.getElementById('foodDesc').value.trim();
+  if (!desc) {
+    showError('Type a description of what you ate first (e.g. "1 string cheese").');
+    return;
+  }
+  lastImage = null;
+  document.getElementById('preview').classList.remove('visible');
+  document.getElementById('results').classList.remove('visible');
+  hideError();
+  await analyzeMeal(null, null, key, desc, document.getElementById('descLogBtn'), '✍️ Log from Description (no photo)');
 }
 
 function displayResults(r) {
