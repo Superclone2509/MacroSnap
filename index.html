@@ -19,6 +19,7 @@
     --green: #4ade80;
     --orange: #fb923c;
     --red: #f87171;
+    --teal: #2dd4bf;
     --radius: 16px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -35,8 +36,14 @@
   .header h1 span { color: var(--accent); }
   .header p { font-size: 13px; color: var(--text2); margin-top: 2px; }
 
-  /* API key setup */
-  .setup { background: var(--surface); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  /* Settings (collapsible) */
+  .setup { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px; }
+  .setup-header {
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; font-size: 15px; font-weight: 600;
+  }
+  .setup-header .chev { color: var(--text2); font-size: 13px; }
+  .setup-body { margin-top: 14px; }
   .setup label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 8px; }
   .setup input {
     width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface2);
@@ -51,6 +58,20 @@
   .setup select:focus { border-color: var(--accent); }
   .setup .hint { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.4; }
   .setup .hint a { color: var(--accent); }
+  .target-row { display: flex; gap: 10px; }
+  .target-row input { flex: 1; min-width: 0; }
+
+  /* Templates (quick log) */
+  .templates { margin-bottom: 16px; }
+  .templates h3 { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--surface2); color: var(--text);
+    padding: 9px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    margin: 0 8px 8px 0; cursor: pointer;
+  }
+  .chip:active { opacity: 0.8; }
+  .chip-x { color: var(--text2); font-size: 13px; padding: 0 2px; }
 
   /* Description input */
   .desc-area { margin-bottom: 16px; }
@@ -62,7 +83,7 @@
   .desc-area textarea::placeholder { color: var(--text2); }
   .desc-area textarea:focus { border-color: var(--accent); }
 
-  /* Camera button */
+  /* Camera buttons */
   .capture-area { text-align: center; margin: 16px 0; }
   .capture-btn {
     width: 100%; padding: 16px; border-radius: var(--radius);
@@ -99,15 +120,16 @@
   }
   .calories-num { font-size: 42px; font-weight: 800; color: var(--accent); }
   .calories-label { font-size: 13px; color: var(--text2); }
-  .macros-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .macros-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .macro-item {
-    text-align: center; padding: 14px 8px; border-radius: 12px; background: var(--bg);
+    text-align: center; padding: 12px 4px; border-radius: 12px; background: var(--bg);
   }
-  .macro-value { font-size: 24px; font-weight: 700; }
-  .macro-label { font-size: 11px; color: var(--text2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .macro-value { font-size: 20px; font-weight: 700; }
+  .macro-label { font-size: 10px; color: var(--text2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
   .macro-item.carbs .macro-value { color: var(--orange); }
   .macro-item.protein .macro-value { color: var(--green); }
   .macro-item.fat .macro-value { color: var(--accent2); }
+  .macro-item.fiber .macro-value { color: var(--teal); }
 
   /* Confidence */
   .confidence { margin-top: 12px; font-size: 12px; color: var(--text2); text-align: center; }
@@ -123,6 +145,23 @@
   .food-item-name { font-size: 14px; }
   .food-item-cals { font-size: 14px; color: var(--text2); }
 
+  /* Action buttons */
+  .health-btn {
+    width: 100%; padding: 14px; border-radius: 12px; margin-top: 14px;
+    background: linear-gradient(135deg, #ff2d55, #ff6b8a);
+    color: white; font-size: 15px; font-weight: 600; border: none; cursor: pointer;
+  }
+  .health-btn:active { opacity: 0.85; transform: scale(0.98); }
+  .health-btn.logged { background: var(--surface2); pointer-events: none; }
+  .action-row { display: flex; gap: 10px; margin-top: 10px; }
+  .secondary-btn {
+    flex: 1; padding: 12px; border-radius: 12px;
+    background: var(--surface2); color: var(--text);
+    font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+  }
+  .secondary-btn:active { opacity: 0.8; }
+  .reanalyze-btn { width: 100%; margin-top: 10px; }
+
   /* Log */
   .log-section { margin-top: 24px; }
   .log-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
@@ -130,12 +169,17 @@
     background: var(--surface); border-radius: 12px; padding: 14px; margin-bottom: 10px;
     display: flex; justify-content: space-between; align-items: center;
   }
-  .log-entry-left { flex: 1; }
+  .log-entry-left { flex: 1; min-width: 0; }
   .log-entry-name { font-size: 15px; font-weight: 600; }
   .log-entry-time { font-size: 12px; color: var(--text2); margin-top: 2px; }
   .log-entry-right { text-align: right; }
   .log-entry-cals { font-size: 18px; font-weight: 700; color: var(--accent); }
   .log-entry-macros { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .entry-actions { display: flex; flex-direction: column; gap: 6px; margin-left: 10px; }
+  .entry-btn {
+    background: var(--surface2); border: none; color: var(--text2);
+    width: 30px; height: 30px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
   .log-empty { text-align: center; color: var(--text2); padding: 30px; font-size: 14px; }
 
   /* Daily total */
@@ -148,14 +192,19 @@
   .daily-total-num { font-size: 28px; font-weight: 800; color: var(--accent); }
   .daily-total-macros { font-size: 13px; color: var(--text2); margin-top: 4px; }
 
-  /* Health button */
-  .health-btn {
-    width: 100%; padding: 14px; border-radius: 12px; margin-top: 14px;
-    background: linear-gradient(135deg, #ff2d55, #ff6b8a);
-    color: white; font-size: 15px; font-weight: 600; border: none; cursor: pointer;
+  /* Progress bars */
+  .progress-row { margin-top: 12px; text-align: left; }
+  .progress-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--text2); margin-bottom: 4px;
   }
-  .health-btn:active { opacity: 0.85; transform: scale(0.98); }
-  .health-btn.logged { background: var(--surface2); pointer-events: none; }
+  .progress-bar { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .progress-fill {
+    height: 100%; border-radius: 4px; width: 0%;
+    background: linear-gradient(90deg, #0ea5e9, #8b5cf6);
+    transition: width 0.3s ease;
+  }
+  .progress-fill.over { background: var(--orange); }
 
   /* Clear log */
   .clear-log {
@@ -181,18 +230,34 @@
 </div>
 
 <div class="setup" id="setup">
-  <label>Gemini API Key</label>
-  <input type="password" id="apiKey" placeholder="Paste your API key here" autocomplete="off">
-  <label style="margin-top:12px;">Model</label>
-  <select id="modelSelect">
-    <option value="gemini-2.5-flash">Gemini 2.5 Flash (recommended)</option>
-    <option value="gemini-3.5-flash">Gemini 3.5 Flash (newest)</option>
-    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (fastest)</option>
-  </select>
-  <div class="hint">
-    Free from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
-    Your key stays on this device only.
+  <div class="setup-header" onclick="toggleSetup()">
+    <span>⚙️ Settings</span>
+    <span class="chev" id="setupChevron">▾</span>
   </div>
+  <div class="setup-body" id="setupBody">
+    <label>Gemini API Key</label>
+    <input type="password" id="apiKey" placeholder="Paste your API key here" autocomplete="off">
+    <label style="margin-top:12px;">Model</label>
+    <select id="modelSelect">
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash (recommended)</option>
+      <option value="gemini-3.5-flash">Gemini 3.5 Flash (newest)</option>
+      <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (fastest)</option>
+    </select>
+    <label style="margin-top:12px;">Daily Targets (optional)</label>
+    <div class="target-row">
+      <input type="number" id="targetCal" placeholder="Calories" inputmode="numeric">
+      <input type="number" id="targetPro" placeholder="Protein (g)" inputmode="numeric">
+    </div>
+    <div class="hint">
+      Free API key from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
+      Your key stays on this device only.
+    </div>
+  </div>
+</div>
+
+<div class="templates" id="templates" style="display:none;">
+  <h3>Quick Log</h3>
+  <div id="templateChips"></div>
 </div>
 
 <div class="desc-area">
@@ -212,6 +277,7 @@
 
 <div class="preview-container" id="preview">
   <img id="previewImg" alt="Meal preview">
+  <button class="secondary-btn reanalyze-btn" id="reanalyzeBtn" style="display:none;" onclick="reanalyze()">🔄 Re-analyze this photo</button>
 </div>
 
 <div class="error" id="error"></div>
@@ -237,10 +303,18 @@
         <div class="macro-value" id="fatVal">0g</div>
         <div class="macro-label">Fat</div>
       </div>
+      <div class="macro-item fiber">
+        <div class="macro-value" id="fiberVal">0g</div>
+        <div class="macro-label">Fiber</div>
+      </div>
     </div>
     <div class="items-list" id="itemsList"></div>
     <div class="confidence" id="confidence"></div>
     <button class="health-btn" id="healthBtn" onclick="logToHealth()">❤️ Log to Apple Health</button>
+    <div class="action-row">
+      <button class="secondary-btn" onclick="saveAsTemplate()">⭐ Save Template</button>
+      <button class="secondary-btn" onclick="shareCard()">📤 Share Image</button>
+    </div>
   </div>
 </div>
 
@@ -250,6 +324,16 @@
     <div class="daily-total-label">Daily Total</div>
     <div class="daily-total-num" id="dailyTotalCals">0</div>
     <div class="daily-total-macros" id="dailyTotalMacros"></div>
+    <div id="progressWrap" style="display:none;">
+      <div class="progress-row" id="calRow">
+        <div class="progress-label"><span>Calories</span><span id="calLabel"></span></div>
+        <div class="progress-bar"><div class="progress-fill" id="calFill"></div></div>
+      </div>
+      <div class="progress-row" id="proRow">
+        <div class="progress-label"><span>Protein</span><span id="proLabel"></span></div>
+        <div class="progress-bar"><div class="progress-fill" id="proFill"></div></div>
+      </div>
+    </div>
   </div>
   <div id="logEntries"><div class="log-empty">No meals logged yet today</div></div>
   <button class="clear-log" id="clearLogBtn" style="display:none;" onclick="clearLog()">Clear Today's Log</button>
@@ -276,6 +360,7 @@ Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
   "carbs_g": 60,
   "protein_g": 30,
   "fat_g": 15,
+  "fiber_g": 8,
   "confidence": "medium",
   "items": [
     {"name": "Item 1", "calories": 250},
@@ -286,26 +371,57 @@ Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
 Rules:
 - Estimate portions based on typical serving sizes and visual cues (plate size, utensils for scale)
 - "confidence" must be "high", "medium", or "low"
+- "fiber_g" is dietary fiber in grams
 - Break down individual items when possible
 - If you cannot identify food in the image, return: {"error": "Could not identify food in this image"}
 - All numbers should be integers`;
 }
 
-// Load saved API key
+// Escape model-provided text before injecting into HTML
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// --- Settings ---
 const apiKeyInput = document.getElementById('apiKey');
 apiKeyInput.value = localStorage.getItem('macrosnap_key') || '';
 apiKeyInput.addEventListener('change', () => {
   localStorage.setItem('macrosnap_key', apiKeyInput.value.trim());
 });
 
-// Load/save model selection
 const modelSelect = document.getElementById('modelSelect');
 modelSelect.value = localStorage.getItem('macrosnap_model') || 'gemini-2.5-flash';
 modelSelect.addEventListener('change', () => {
   localStorage.setItem('macrosnap_model', modelSelect.value);
 });
 
-// File input handler (shared by camera and library inputs)
+const targetCalInput = document.getElementById('targetCal');
+const targetProInput = document.getElementById('targetPro');
+targetCalInput.value = localStorage.getItem('macrosnap_target_cal') || '';
+targetProInput.value = localStorage.getItem('macrosnap_target_pro') || '';
+targetCalInput.addEventListener('change', () => {
+  localStorage.setItem('macrosnap_target_cal', targetCalInput.value.trim());
+  renderLog();
+});
+targetProInput.addEventListener('change', () => {
+  localStorage.setItem('macrosnap_target_pro', targetProInput.value.trim());
+  renderLog();
+});
+
+function toggleSetup() {
+  const body = document.getElementById('setupBody');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  document.getElementById('setupChevron').textContent = open ? '▸' : '▾';
+}
+// Start collapsed once an API key has been saved
+if (localStorage.getItem('macrosnap_key')) toggleSetup();
+
+// --- Photo selection (camera and library share one handler) ---
+let lastImage = null;        // {data, mime} of the most recent photo
+let lastPhotoLoggedId = null; // log entry id created by the last photo analysis
+let lastResult = null;
+
 async function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -316,15 +432,18 @@ async function handleFileSelect(e) {
     return;
   }
 
-  // Show preview
   const reader = new FileReader();
   reader.onload = async (ev) => {
     const base64Full = ev.target.result;
     const base64Data = base64Full.split(',')[1];
     const mimeType = file.type || 'image/jpeg';
 
+    lastImage = { data: base64Data, mime: mimeType };
+    lastPhotoLoggedId = null;
+
     document.getElementById('previewImg').src = base64Full;
     document.getElementById('preview').classList.add('visible');
+    document.getElementById('reanalyzeBtn').style.display = 'block';
     document.getElementById('results').classList.remove('visible');
     hideError();
 
@@ -338,6 +457,26 @@ async function handleFileSelect(e) {
 }
 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 document.getElementById('libraryInput').addEventListener('change', handleFileSelect);
+
+// Re-run analysis on the same photo (e.g. after editing the description,
+// or retrying when the Gemini server was busy). Replaces the entry the
+// first analysis logged, so you don't get duplicates.
+async function reanalyze() {
+  if (!lastImage) return;
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    showError('Please enter your Gemini API key first.');
+    return;
+  }
+  if (lastPhotoLoggedId !== null) {
+    saveLog(getLog().filter(en => en.id !== lastPhotoLoggedId));
+    lastPhotoLoggedId = null;
+    renderLog();
+  }
+  hideError();
+  const desc = document.getElementById('foodDesc').value.trim();
+  await analyzeImage(lastImage.data, lastImage.mime, key, desc);
+}
 
 async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
   const btn = document.getElementById('captureBtn');
@@ -384,7 +523,7 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
 
     lastResult = result;
     displayResults(result);
-    addToLog(result);
+    lastPhotoLoggedId = addToLog(result);
 
   } catch (err) {
     showError(err.message);
@@ -394,8 +533,6 @@ async function analyzeImage(base64Data, mimeType, apiKey, userDesc) {
   }
 }
 
-let lastResult = null;
-
 function displayResults(r) {
   document.getElementById('mealName').textContent = r.meal_name;
   document.getElementById('mealDesc').textContent = r.description;
@@ -403,6 +540,7 @@ function displayResults(r) {
   document.getElementById('carbsVal').textContent = r.carbs_g + 'g';
   document.getElementById('proteinVal').textContent = r.protein_g + 'g';
   document.getElementById('fatVal').textContent = r.fat_g + 'g';
+  document.getElementById('fiberVal').textContent = (r.fiber_g ?? 0) + 'g';
 
   // Confidence
   const confMap = { high: '🟢 High confidence', medium: '🟡 Medium confidence', low: '🔴 Low confidence' };
@@ -412,7 +550,7 @@ function displayResults(r) {
   const list = document.getElementById('itemsList');
   if (r.items && r.items.length > 0) {
     list.innerHTML = '<h3>Breakdown</h3>' + r.items.map(i =>
-      `<div class="food-item"><span class="food-item-name">${i.name}</span><span class="food-item-cals">${i.calories} cal</span></div>`
+      `<div class="food-item"><span class="food-item-name">${esc(i.name)}</span><span class="food-item-cals">${esc(i.calories)} cal</span></div>`
     ).join('');
   } else {
     list.innerHTML = '';
@@ -430,11 +568,10 @@ function logToHealth() {
   if (!lastResult) return;
   const r = lastResult;
   // Comma-separated numbers — Shortcut splits by Custom separator ","
-  // Order: calories, protein, carbs, fat
-  const data = `${r.calories},${r.protein_g},${r.carbs_g},${r.fat_g}`;
+  // Order: calories, protein, carbs, fat, fiber (fiber is item 5, optional in the Shortcut)
+  const data = `${r.calories},${r.protein_g},${r.carbs_g},${r.fat_g},${r.fiber_g ?? 0}`;
   const url = `shortcuts://run-shortcut?name=MacroSnap%20Log&input=text&text=${data}`;
 
-  // Mark button as logged
   const hb = document.getElementById('healthBtn');
   hb.classList.add('logged');
   hb.textContent = '✓ Sent to Shortcut';
@@ -442,9 +579,174 @@ function logToHealth() {
   window.location.href = url;
 }
 
-// --- Food Log (localStorage, per-day) ---
+// --- Meal templates (quick log) ---
+function getTemplates() {
+  try { return JSON.parse(localStorage.getItem('macrosnap_templates')) || []; }
+  catch { return []; }
+}
+function saveTemplates(t) {
+  localStorage.setItem('macrosnap_templates', JSON.stringify(t));
+}
+
+function saveAsTemplate() {
+  if (!lastResult) return;
+  const name = prompt('Template name:', lastResult.meal_name);
+  if (!name) return;
+  const t = getTemplates();
+  t.push({
+    name: name.trim(),
+    calories: lastResult.calories,
+    carbs: lastResult.carbs_g,
+    protein: lastResult.protein_g,
+    fat: lastResult.fat_g,
+    fiber: lastResult.fiber_g ?? 0
+  });
+  saveTemplates(t);
+  renderTemplates();
+}
+
+function renderTemplates() {
+  const t = getTemplates();
+  const sec = document.getElementById('templates');
+  if (t.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  document.getElementById('templateChips').innerHTML = t.map((tp, i) =>
+    `<span class="chip" onclick="logTemplate(${i})">${esc(tp.name)} · ${esc(tp.calories)} cal` +
+    `<span class="chip-x" onclick="event.stopPropagation();deleteTemplate(${i})">✕</span></span>`
+  ).join('');
+}
+
+function logTemplate(i) {
+  const tp = getTemplates()[i];
+  if (!tp) return;
+  const result = {
+    meal_name: tp.name,
+    description: 'Logged from template',
+    calories: tp.calories,
+    carbs_g: tp.carbs,
+    protein_g: tp.protein,
+    fat_g: tp.fat,
+    fiber_g: tp.fiber ?? 0,
+    confidence: '',
+    items: []
+  };
+  lastResult = result;
+  displayResults(result);
+  addToLog(result);
+}
+
+function deleteTemplate(i) {
+  if (!confirm('Delete this template?')) return;
+  const t = getTemplates();
+  t.splice(i, 1);
+  saveTemplates(t);
+  renderTemplates();
+}
+
+// --- Share meal card as image ---
+function shareCard() {
+  if (!lastResult) return;
+  const r = lastResult;
+  const items = (r.items || []).slice(0, 6);
+  const W = 720;
+  const itemsH = items.length ? items.length * 44 + 50 : 0;
+  const H = 470 + itemsH + 70;
+
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const font = '-apple-system, BlinkMacSystemFont, sans-serif';
+
+  function box(bx, by, bw, bh, fill) {
+    x.fillStyle = fill;
+    if (x.roundRect) { x.beginPath(); x.roundRect(bx, by, bw, bh, 14); x.fill(); }
+    else x.fillRect(bx, by, bw, bh);
+  }
+
+  // Background
+  x.fillStyle = '#0f172a';
+  x.fillRect(0, 0, W, H);
+
+  x.textAlign = 'center';
+  // Branding
+  x.font = `bold 30px ${font}`;
+  x.fillStyle = '#22d3ee';
+  x.fillText('MacroSnap', W / 2, 56);
+  // Meal name (truncate to fit)
+  let name = String(r.meal_name || 'Meal');
+  x.font = `bold 36px ${font}`;
+  while (x.measureText(name).width > W - 80 && name.length > 4) name = name.slice(0, -2);
+  x.fillStyle = '#f1f5f9';
+  x.fillText(name, W / 2, 116);
+  // Calories
+  x.font = `800 88px ${font}`;
+  x.fillStyle = '#22d3ee';
+  x.fillText(String(r.calories), W / 2, 226);
+  x.font = `22px ${font}`;
+  x.fillStyle = '#94a3b8';
+  x.fillText('calories', W / 2, 258);
+
+  // Macro boxes
+  const macros = [
+    ['CARBS', (r.carbs_g ?? 0) + 'g', '#fb923c'],
+    ['PROTEIN', (r.protein_g ?? 0) + 'g', '#4ade80'],
+    ['FAT', (r.fat_g ?? 0) + 'g', '#a78bfa'],
+    ['FIBER', (r.fiber_g ?? 0) + 'g', '#2dd4bf']
+  ];
+  const bw = 150, gap = 16, bx0 = (W - (bw * 4 + gap * 3)) / 2, by = 300;
+  macros.forEach((m, i) => {
+    const bx = bx0 + i * (bw + gap);
+    box(bx, by, bw, 110, '#1e293b');
+    x.font = `bold 34px ${font}`;
+    x.fillStyle = m[2];
+    x.fillText(m[1], bx + bw / 2, by + 58);
+    x.font = `16px ${font}`;
+    x.fillStyle = '#94a3b8';
+    x.fillText(m[0], bx + bw / 2, by + 88);
+  });
+
+  // Items
+  let y = by + 160;
+  if (items.length) {
+    items.forEach(it => {
+      x.textAlign = 'left';
+      x.font = `24px ${font}`;
+      x.fillStyle = '#f1f5f9';
+      let iname = String(it.name || '');
+      while (x.measureText(iname).width > W - 240 && iname.length > 4) iname = iname.slice(0, -2);
+      x.fillText(iname, 60, y);
+      x.textAlign = 'right';
+      x.fillStyle = '#94a3b8';
+      x.fillText((it.calories ?? 0) + ' cal', W - 60, y);
+      y += 44;
+    });
+  }
+
+  // Footer date
+  x.textAlign = 'center';
+  x.font = `20px ${font}`;
+  x.fillStyle = '#64748b';
+  x.fillText(new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }), W / 2, H - 28);
+
+  c.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], 'macrosnap-meal.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); } catch (e) { /* user cancelled */ }
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'macrosnap-meal.png';
+      a.click();
+    }
+  }, 'image/png');
+}
+
+// --- Food Log (localStorage, per-day, local time) ---
 function getTodayKey() {
-  return 'macrosnap_log_' + new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `macrosnap_log_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function getLog() {
@@ -458,16 +760,20 @@ function saveLog(log) {
 
 function addToLog(result) {
   const log = getLog();
+  const id = Date.now();
   log.push({
+    id,
     name: result.meal_name,
     calories: result.calories,
     carbs: result.carbs_g,
     protein: result.protein_g,
     fat: result.fat_g,
+    fiber: result.fiber_g ?? 0,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveLog(log);
   renderLog();
+  return id;
 }
 
 function renderLog() {
@@ -483,25 +789,79 @@ function renderLog() {
     return;
   }
 
-  let tCal = 0, tCarb = 0, tPro = 0, tFat = 0;
-  container.innerHTML = log.map(e => {
-    tCal += e.calories; tCarb += e.carbs; tPro += e.protein; tFat += e.fat;
+  let tCal = 0, tCarb = 0, tPro = 0, tFat = 0, tFib = 0;
+  container.innerHTML = log.map((e, i) => {
+    tCal += e.calories; tCarb += e.carbs; tPro += e.protein; tFat += e.fat; tFib += e.fiber || 0;
     return `<div class="log-entry">
       <div class="log-entry-left">
-        <div class="log-entry-name">${e.name}</div>
-        <div class="log-entry-time">${e.time}</div>
+        <div class="log-entry-name">${esc(e.name)}</div>
+        <div class="log-entry-time">${esc(e.time)}</div>
       </div>
       <div class="log-entry-right">
-        <div class="log-entry-cals">${e.calories}</div>
-        <div class="log-entry-macros">C${e.carbs}g · P${e.protein}g · F${e.fat}g</div>
+        <div class="log-entry-cals">${esc(e.calories)}</div>
+        <div class="log-entry-macros">C${esc(e.carbs)}g · P${esc(e.protein)}g · F${esc(e.fat)}g · Fb${esc(e.fiber || 0)}g</div>
+      </div>
+      <div class="entry-actions">
+        <button class="entry-btn" onclick="editEntry(${i})" aria-label="Edit">✎</button>
+        <button class="entry-btn" onclick="deleteEntry(${i})" aria-label="Delete">✕</button>
       </div>
     </div>`;
   }).join('');
 
   document.getElementById('dailyTotalCals').textContent = tCal;
-  document.getElementById('dailyTotalMacros').textContent = `C ${tCarb}g · P ${tPro}g · F ${tFat}g`;
+  document.getElementById('dailyTotalMacros').textContent = `C ${tCarb}g · P ${tPro}g · F ${tFat}g · Fb ${tFib}g`;
   totalEl.style.display = 'block';
   clearBtn.style.display = 'block';
+
+  renderProgress(tCal, tPro);
+}
+
+function renderProgress(cal, pro) {
+  const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
+  const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
+  const wrap = document.getElementById('progressWrap');
+  if (!calT && !proT) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  setBar('calRow', 'calFill', 'calLabel', cal, calT);
+  setBar('proRow', 'proFill', 'proLabel', pro, proT);
+}
+
+function setBar(rowId, fillId, labelId, value, target) {
+  const row = document.getElementById(rowId);
+  if (!target) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  const fill = document.getElementById(fillId);
+  fill.style.width = Math.min(100, (value / target) * 100) + '%';
+  fill.classList.toggle('over', value > target);
+  document.getElementById(labelId).textContent = `${value} / ${target}`;
+}
+
+function editEntry(i) {
+  const log = getLog();
+  const e = log[i];
+  if (!e) return;
+  const name = prompt('Meal name:', e.name); if (name === null) return;
+  const cal = prompt('Calories:', e.calories); if (cal === null) return;
+  const pro = prompt('Protein (g):', e.protein); if (pro === null) return;
+  const carb = prompt('Carbs (g):', e.carbs); if (carb === null) return;
+  const fat = prompt('Fat (g):', e.fat); if (fat === null) return;
+  const fib = prompt('Fiber (g):', e.fiber ?? 0); if (fib === null) return;
+  e.name = name.trim() || e.name;
+  e.calories = parseInt(cal) || 0;
+  e.protein = parseInt(pro) || 0;
+  e.carbs = parseInt(carb) || 0;
+  e.fat = parseInt(fat) || 0;
+  e.fiber = parseInt(fib) || 0;
+  saveLog(log);
+  renderLog();
+}
+
+function deleteEntry(i) {
+  if (!confirm('Delete this entry?')) return;
+  const log = getLog();
+  log.splice(i, 1);
+  saveLog(log);
+  renderLog();
 }
 
 function clearLog() {
@@ -514,8 +874,9 @@ function clearLog() {
 function showError(msg) { const el = document.getElementById('error'); el.textContent = msg; el.classList.add('visible'); }
 function hideError() { document.getElementById('error').classList.remove('visible'); }
 
-// Render log on load
+// Initial render
 renderLog();
+renderTemplates();
 </script>
 </body>
 </html>
