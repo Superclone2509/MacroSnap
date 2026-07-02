@@ -74,9 +74,17 @@
   .chip-x { color: var(--text2); font-size: 13px; padding: 0 2px; }
 
   /* Description input */
-  .desc-area { margin-bottom: 16px; }
+  .desc-area { margin-bottom: 16px; position: relative; }
+  .desc-clear {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--surface2); color: var(--text2);
+    font-size: 13px; line-height: 26px; text-align: center; cursor: pointer;
+    display: none;
+  }
+  .desc-clear.visible { display: block; }
   .desc-area textarea {
-    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface2);
+    width: 100%; padding: 12px; padding-right: 42px; border-radius: 10px; border: 1px solid var(--surface2);
     background: var(--surface); color: var(--text); font-size: 14px; outline: none;
     resize: none; font-family: inherit; min-height: 44px; max-height: 120px;
   }
@@ -133,6 +141,16 @@
 
   /* Confidence */
   .confidence { margin-top: 12px; font-size: 12px; color: var(--text2); text-align: center; }
+
+  /* Portion selector */
+  .portion-row { margin-top: 14px; }
+  .portion-label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .portion-btns { display: flex; gap: 6px; }
+  .portion-btn {
+    flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid var(--surface2);
+    background: var(--bg); color: var(--text2); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .portion-btn.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
 
   /* Items breakdown */
   .items-list { margin-top: 16px; }
@@ -262,6 +280,7 @@
 
 <div class="desc-area">
   <textarea id="foodDesc" rows="2" placeholder="Optional: describe the meal (e.g. &quot;grilled chicken with rice, about 6oz chicken&quot;)"></textarea>
+  <button class="desc-clear" id="descClear" onclick="clearDesc()" aria-label="Clear description">✕</button>
   <button class="secondary-btn" id="descLogBtn" style="width:100%; margin-top:8px;" onclick="analyzeFromText()">✍️ Log from Description (no photo)</button>
 </div>
 
@@ -311,6 +330,17 @@
     </div>
     <div class="items-list" id="itemsList"></div>
     <div class="confidence" id="confidence"></div>
+    <div class="portion-row">
+      <span class="portion-label">Portion eaten</span>
+      <div class="portion-btns">
+        <button class="portion-btn" data-f="0.25" onclick="setPortion(0.25)">¼</button>
+        <button class="portion-btn" data-f="0.5" onclick="setPortion(0.5)">½</button>
+        <button class="portion-btn" data-f="0.75" onclick="setPortion(0.75)">¾</button>
+        <button class="portion-btn active" data-f="1" onclick="setPortion(1)">1</button>
+        <button class="portion-btn" data-f="1.5" onclick="setPortion(1.5)">1½</button>
+        <button class="portion-btn" data-f="2" onclick="setPortion(2)">2</button>
+      </div>
+    </div>
     <button class="health-btn" id="healthBtn" onclick="logToHealth()">❤️ Log to Apple Health</button>
     <div class="action-row">
       <button class="secondary-btn" onclick="saveAsTemplate()">⭐ Save Template</button>
@@ -377,6 +407,8 @@ Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
 
 Rules:
 - Estimate portions based on typical serving sizes and, when a photo is provided, visual cues (plate size, utensils for scale)
+- If a credit card, ruler, or other known-size object is visible in the photo, use it as a scale reference to calibrate portion sizes (a standard credit card is 8.6 x 5.4 cm)
+- Brightly colored solid-tone plates with concentric rings are Fiesta dinnerware: dinner plates are 26.7 cm in diameter, smaller luncheon plates are 22.9 cm
 - "confidence" must be "high", "medium", or "low"
 - "fiber_g" is dietary fiber in grams
 - Break down individual items when possible
@@ -415,6 +447,18 @@ targetProInput.addEventListener('change', () => {
   renderLog();
 });
 
+// --- Description clear button ---
+const foodDescEl = document.getElementById('foodDesc');
+const descClearBtn = document.getElementById('descClear');
+foodDescEl.addEventListener('input', () => {
+  descClearBtn.classList.toggle('visible', foodDescEl.value.length > 0);
+});
+function clearDesc() {
+  foodDescEl.value = '';
+  descClearBtn.classList.remove('visible');
+  foodDescEl.focus();
+}
+
 function toggleSetup() {
   const body = document.getElementById('setupBody');
   const open = body.style.display !== 'none';
@@ -427,7 +471,49 @@ if (localStorage.getItem('macrosnap_key')) toggleSetup();
 // --- Photo selection (camera and library share one handler) ---
 let lastImage = null;        // {data, mime} of the most recent photo
 let lastPhotoLoggedId = null; // log entry id created by the last photo analysis
-let lastResult = null;
+let lastResult = null;       // currently displayed (possibly portion-scaled) result
+let baseResult = null;       // unscaled result, basis for portion scaling
+let currentEntryId = null;   // log entry id for the currently displayed result
+
+// --- Portion scaling ---
+function scaleResult(r, f) {
+  return {
+    ...r,
+    calories: Math.round((r.calories || 0) * f),
+    carbs_g: Math.round((r.carbs_g || 0) * f),
+    protein_g: Math.round((r.protein_g || 0) * f),
+    fat_g: Math.round((r.fat_g || 0) * f),
+    fiber_g: Math.round((r.fiber_g || 0) * f),
+    items: (r.items || []).map(i => ({ ...i, calories: Math.round((i.calories || 0) * f) }))
+  };
+}
+
+function highlightPortion(f) {
+  document.querySelectorAll('.portion-btn').forEach(b =>
+    b.classList.toggle('active', parseFloat(b.dataset.f) === f));
+}
+
+function setPortion(f) {
+  if (!baseResult) return;
+  const scaled = scaleResult(baseResult, f);
+  lastResult = scaled;
+  displayResults(scaled);
+  highlightPortion(f);
+  // Update the already-logged entry to match
+  if (currentEntryId !== null) {
+    const log = getLog();
+    const e = log.find(en => en.id === currentEntryId);
+    if (e) {
+      e.calories = scaled.calories;
+      e.carbs = scaled.carbs_g;
+      e.protein = scaled.protein_g;
+      e.fat = scaled.fat_g;
+      e.fiber = scaled.fiber_g;
+      saveLog(log);
+      renderLog();
+    }
+  }
+}
 
 async function handleFileSelect(e) {
   const file = e.target.files[0];
@@ -528,8 +614,11 @@ async function analyzeMeal(base64Data, mimeType, apiKey, userDesc, btn, idleLabe
     }
 
     lastResult = result;
+    baseResult = result;
     displayResults(result);
+    highlightPortion(1);
     lastPhotoLoggedId = addToLog(result);
+    currentEntryId = lastPhotoLoggedId;
 
   } catch (err) {
     showError(err.message);
@@ -656,8 +745,10 @@ function logTemplate(i) {
     items: []
   };
   lastResult = result;
+  baseResult = result;
   displayResults(result);
-  addToLog(result);
+  highlightPortion(1);
+  currentEntryId = addToLog(result);
 }
 
 function deleteTemplate(i) {
