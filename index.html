@@ -409,6 +409,7 @@
     <button class="wt-btn" id="wtPro" onclick="setWeekMetric('pro')">Protein</button>
   </div>
   <div id="weekChart"></div>
+  <button class="secondary-btn" style="width:100%; margin-top:12px;" onclick="shareCoachingLog()">📋 Export Food Log for Coaching</button>
 </div>
 
 <script>
@@ -1075,15 +1076,15 @@ function renderWeek() {
   const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
   const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
 
-  // Summary
-  const logged = days.filter(d => d.logged);
+  // Summary — excludes today: a partial day would skew averages down
+  const logged = days.slice(0, 6).filter(d => d.logged);
   let html;
   if (logged.length === 0) {
-    html = 'No meals logged in the past 7 days.';
+    html = 'Averages appear once you have a full day logged (today is excluded until it\'s complete).';
   } else {
     const avgCal = Math.round(logged.reduce((s, d) => s + d.cal, 0) / logged.length);
     const avgPro = Math.round(logged.reduce((s, d) => s + d.pro, 0) / logged.length);
-    html = `${logged.length} day${logged.length > 1 ? 's' : ''} logged · avg <b>${avgCal}</b> cal · <b>${avgPro}g</b> protein per day`;
+    html = `Past ${logged.length} full day${logged.length > 1 ? 's' : ''}: avg <b>${avgCal}</b> cal · <b>${avgPro}g</b> protein per day`;
     const hits = [];
     if (calT) hits.push(`calories at/under target <b>${logged.filter(d => d.cal <= calT).length}/${logged.length}</b> days`);
     if (proT) hits.push(`protein target hit <b>${logged.filter(d => d.pro >= proT).length}/${logged.length}</b> days`);
@@ -1134,6 +1135,60 @@ function setBar(rowId, fillId, labelId, value, target) {
   fill.style.width = Math.min(100, (value / target) * 100) + '%';
   fill.classList.toggle('over', value > target);
   document.getElementById(labelId).textContent = `${value} / ${target}`;
+}
+
+// --- Coaching export: full food history as shareable text ---
+async function shareCoachingLog() {
+  const keys = Object.keys(localStorage)
+    .filter(k => k.startsWith('macrosnap_log_'))
+    .sort();
+  const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
+  const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
+
+  let out = 'MacroSnap food log\n';
+  if (calT || proT) {
+    const t = [];
+    if (calT) t.push(`${calT} cal`);
+    if (proT) t.push(`${proT}g protein`);
+    out += `Daily targets: ${t.join(', ')}\n`;
+  }
+  out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber.\n\n';
+
+  let daysOut = 0;
+  keys.forEach(k => {
+    const log = getLogFor(k);
+    if (!log.length) return;
+    daysOut++;
+    const dateStr = k.replace('macrosnap_log_', '');
+    const d = new Date(dateStr + 'T12:00:00');
+    const label = isNaN(d) ? dateStr : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    let tCal = 0, tC = 0, tP = 0, tF = 0, tFb = 0;
+    const lines = log.map(e => {
+      tCal += e.calories; tC += e.carbs; tP += e.protein; tF += e.fat; tFb += e.fiber || 0;
+      return `- ${e.time} ${e.name}: ${e.calories} cal (C${e.carbs} P${e.protein} F${e.fat} Fb${e.fiber || 0})`;
+    });
+    out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})\n${lines.join('\n')}\n\n`;
+  });
+
+  if (daysOut === 0) {
+    showError('No logged meals to export yet.');
+    return;
+  }
+
+  try {
+    if (navigator.share) {
+      await navigator.share({ text: out });
+      return;
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return; // user closed the share sheet
+  }
+  try {
+    await navigator.clipboard.writeText(out);
+    alert('Food log copied to clipboard.');
+  } catch {
+    alert('Could not open the share sheet or copy to clipboard.');
+  }
 }
 
 function editEntry(i) {
