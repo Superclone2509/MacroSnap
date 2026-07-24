@@ -581,6 +581,7 @@ function setPortion(f) {
       e.protein = scaled.protein_g;
       e.fat = scaled.fat_g;
       e.fiber = scaled.fiber_g;
+      e.items = (scaled.items || []).map(i => ({ name: i.name, calories: i.calories }));
       saveLogFor(key, log);
       renderLog();
     }
@@ -996,6 +997,7 @@ function addToLog(result) {
     protein: result.protein_g,
     fat: result.fat_g,
     fiber: result.fiber_g ?? 0,
+    items: (result.items || []).map(i => ({ name: i.name, calories: i.calories })),
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveLogFor(key, log);
@@ -1165,7 +1167,11 @@ async function shareCoachingLog() {
     let tCal = 0, tC = 0, tP = 0, tF = 0, tFb = 0;
     const lines = log.map(e => {
       tCal += e.calories; tC += e.carbs; tP += e.protein; tF += e.fat; tFb += e.fiber || 0;
-      return `- ${e.time} ${e.name}: ${e.calories} cal (C${e.carbs} P${e.protein} F${e.fat} Fb${e.fiber || 0})`;
+      let line = `- ${e.time} ${e.name}: ${e.calories} cal (C${e.carbs} P${e.protein} F${e.fat} Fb${e.fiber || 0})`;
+      if (e.items && e.items.length > 1) {
+        line += '\n' + e.items.map(i => `    · ${i.name}: ${i.calories} cal`).join('\n');
+      }
+      return line;
     });
     out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})\n${lines.join('\n')}\n\n`;
   });
