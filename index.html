@@ -409,7 +409,10 @@
     <button class="wt-btn" id="wtPro" onclick="setWeekMetric('pro')">Protein</button>
   </div>
   <div id="weekChart"></div>
-  <button class="secondary-btn" style="width:100%; margin-top:12px;" onclick="shareCoachingLog()">📋 Export Food Log for Coaching</button>
+  <div class="action-row" style="margin-top:12px;">
+    <button class="secondary-btn" onclick="shareCoachingLog(EXPORT_DAYS)">📋 Export Last 14 Days</button>
+    <button class="secondary-btn" onclick="shareCoachingLog(0)">🗂️ Export All</button>
+  </div>
 </div>
 
 <script>
@@ -1139,15 +1142,20 @@ function setBar(rowId, fillId, labelId, value, target) {
   document.getElementById(labelId).textContent = `${value} / ${target}`;
 }
 
-// --- Coaching export: full food history as shareable text ---
-async function shareCoachingLog() {
+// --- Coaching export: food history as shareable text ---
+// days = number of most recent days to include; 0 = full history.
+// Storage is never trimmed either way.
+const EXPORT_DAYS = 14;
+
+async function shareCoachingLog(days) {
+  const cutoff = days > 0 ? getKeyFor(-(days - 1)) : '';
   const keys = Object.keys(localStorage)
-    .filter(k => k.startsWith('macrosnap_log_'))
+    .filter(k => k.startsWith('macrosnap_log_') && (!cutoff || k >= cutoff))
     .sort();
   const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
   const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
 
-  let out = 'MacroSnap food log\n';
+  let out = `MacroSnap food log (${days > 0 ? `last ${days} days` : 'full history'})\n`;
   if (calT || proT) {
     const t = [];
     if (calT) t.push(`${calT} cal`);
