@@ -288,10 +288,15 @@
       <option value="gemini-3.5-flash">Gemini 3.5 Flash (recommended)</option>
       <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (fastest)</option>
     </select>
-    <label style="margin-top:12px;">Daily Targets (optional)</label>
+    <label style="margin-top:12px;">Daily Targets — Weekdays (optional)</label>
     <div class="target-row">
       <input type="number" id="targetCal" placeholder="Calories" inputmode="numeric">
       <input type="number" id="targetPro" placeholder="Protein (g)" inputmode="numeric">
+    </div>
+    <label style="margin-top:12px;">Weekend Targets (blank = same as weekdays)</label>
+    <div class="target-row">
+      <input type="number" id="targetCalWe" placeholder="Calories" inputmode="numeric">
+      <input type="number" id="targetProWe" placeholder="Protein (g)" inputmode="numeric">
     </div>
     <div class="hint">
       Free API key from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
@@ -508,18 +513,54 @@ modelSelect.addEventListener('change', () => {
   localStorage.setItem('macrosnap_model', modelSelect.value);
 });
 
-const targetCalInput = document.getElementById('targetCal');
-const targetProInput = document.getElementById('targetPro');
-targetCalInput.value = localStorage.getItem('macrosnap_target_cal') || '';
-targetProInput.value = localStorage.getItem('macrosnap_target_pro') || '';
-targetCalInput.addEventListener('change', () => {
-  localStorage.setItem('macrosnap_target_cal', targetCalInput.value.trim());
-  renderLog();
+// Targets: weekday + optional weekend override. Changes snapshot to TODAY only —
+// past days keep the targets they were logged under (see snapshotTargets).
+[
+  ['targetCal', 'macrosnap_target_cal'],
+  ['targetPro', 'macrosnap_target_pro'],
+  ['targetCalWe', 'macrosnap_target_cal_we'],
+  ['targetProWe', 'macrosnap_target_pro_we']
+].forEach(([id, key]) => {
+  const el = document.getElementById(id);
+  el.value = localStorage.getItem(key) || '';
+  el.addEventListener('change', () => {
+    localStorage.setItem(key, el.value.trim());
+    snapshotTargets(0); // today's snapshot reflects the new goal immediately
+    renderLog();
+  });
 });
-targetProInput.addEventListener('change', () => {
-  localStorage.setItem('macrosnap_target_pro', targetProInput.value.trim());
-  renderLog();
-});
+
+// --- Per-day target snapshots ---
+function isWeekendKey(logKey) {
+  const d = new Date(logKey.replace('macrosnap_log_', '') + 'T12:00:00');
+  return d.getDay() === 0 || d.getDay() === 6;
+}
+// What the CURRENT settings say the target is for a given date (weekend-aware)
+function currentTargetsForKey(logKey) {
+  const we = isWeekendKey(logKey);
+  const cal = (we && parseInt(localStorage.getItem('macrosnap_target_cal_we'))) ||
+              parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
+  const pro = (we && parseInt(localStorage.getItem('macrosnap_target_pro_we'))) ||
+              parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
+  return { cal, pro };
+}
+function targetsKeyFor(logKey) {
+  return logKey.replace('macrosnap_log_', 'macrosnap_targets_');
+}
+// Record today's effective targets (called on every log write and settings change)
+function snapshotTargets(offset) {
+  const logKey = getKeyFor(offset);
+  localStorage.setItem(targetsKeyFor(logKey), JSON.stringify(currentTargetsForKey(logKey)));
+}
+// What the target WAS on a given day (snapshot), falling back to current
+// settings for days logged before snapshots existed
+function getTargetsFor(logKey) {
+  try {
+    const t = JSON.parse(localStorage.getItem(targetsKeyFor(logKey)));
+    if (t) return { cal: t.cal || 0, pro: t.pro || 0 };
+  } catch {}
+  return currentTargetsForKey(logKey);
+}
 
 // --- Description clear button ---
 const foodDescEl = document.getElementById('foodDesc');
@@ -1004,6 +1045,7 @@ function addToLog(result) {
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveLogFor(key, log);
+  snapshotTargets(0); // record what the goals were on this day
   viewOffset = 0; // jump back to today so the new entry is visible
   renderLog();
   return id;
@@ -1067,21 +1109,22 @@ function setWeekMetric(m) {
 function renderWeek() {
   const days = [];
   for (let o = -6; o <= 0; o++) {
-    const log = getLogFor(getKeyFor(o));
+    const key = getKeyFor(o);
+    const log = getLogFor(key);
+    const t = getTargetsFor(key);
     const d = new Date();
     d.setDate(d.getDate() + o);
     days.push({
       label: d.toLocaleDateString(undefined, { weekday: 'narrow' }),
       cal: log.reduce((s, e) => s + (e.calories || 0), 0),
       pro: log.reduce((s, e) => s + (e.protein || 0), 0),
-      logged: log.length > 0
+      logged: log.length > 0,
+      tCal: t.cal, tPro: t.pro
     });
   }
 
-  const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
-  const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
-
-  // Summary — excludes today: a partial day would skew averages down
+  // Summary — excludes today: a partial day would skew averages down.
+  // Each day is judged against ITS OWN target (per-day snapshots).
   const logged = days.slice(0, 6).filter(d => d.logged);
   let html;
   if (logged.length === 0) {
@@ -1091,16 +1134,18 @@ function renderWeek() {
     const avgPro = Math.round(logged.reduce((s, d) => s + d.pro, 0) / logged.length);
     html = `Past ${logged.length} full day${logged.length > 1 ? 's' : ''}: avg <b>${avgCal}</b> cal · <b>${avgPro}g</b> protein per day`;
     const hits = [];
-    if (calT) hits.push(`calories at/under target <b>${logged.filter(d => d.cal <= calT).length}/${logged.length}</b> days`);
-    if (proT) hits.push(`protein target hit <b>${logged.filter(d => d.pro >= proT).length}/${logged.length}</b> days`);
+    const calDays = logged.filter(d => d.tCal);
+    const proDays = logged.filter(d => d.tPro);
+    if (calDays.length) hits.push(`calories at/under target <b>${calDays.filter(d => d.cal <= d.tCal).length}/${calDays.length}</b> days`);
+    if (proDays.length) hits.push(`protein target hit <b>${proDays.filter(d => d.pro >= d.tPro).length}/${proDays.length}</b> days`);
     if (hits.length) html += '<br>' + hits.join(' · ');
   }
   document.getElementById('weekSummary').innerHTML = html;
 
-  // Chart
+  // Chart — per-day target ticks (targets can differ weekday vs weekend)
   const vals = days.map(d => weekMetric === 'cal' ? d.cal : d.pro);
-  const target = weekMetric === 'cal' ? calT : proT;
-  const max = Math.max(...vals, target, 1);
+  const targs = days.map(d => weekMetric === 'cal' ? d.tCal : d.tPro);
+  const max = Math.max(...vals, ...targs, 1);
   const W = 350, H = 150, chartH = 106, top = 24;
   const bw = 34, gap = (W - 7 * bw) / 8;
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">`;
@@ -1112,24 +1157,27 @@ function renderWeek() {
     svg += `<rect x="${x}" y="${y}" width="${bw}" height="${v ? h : 2}" rx="4" fill="${i === 6 ? 'var(--accent)' : 'var(--surface2)'}"/>`;
     if (v) svg += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="9" fill="var(--text2)">${v}</text>`;
     svg += `<text x="${x + bw / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--text2)">${d.label}</text>`;
+    const tg = targs[i];
+    if (tg) {
+      const ty = top + chartH - Math.round(Math.min(1, tg / max) * chartH);
+      svg += `<line x1="${x - 2}" x2="${x + bw + 2}" y1="${ty}" y2="${ty}" stroke="var(--orange)" stroke-dasharray="3 2" stroke-width="1.5"/>`;
+    }
   });
-  if (target) {
-    const ty = top + chartH - Math.round(Math.min(1, target / max) * chartH);
-    svg += `<line x1="0" x2="${W}" y1="${ty}" y2="${ty}" stroke="var(--orange)" stroke-dasharray="4 3" stroke-width="1.5"/>`;
-    svg += `<text x="${W - 2}" y="${ty - 4}" text-anchor="end" font-size="9" fill="var(--orange)">target ${target}</text>`;
+  if (targs.some(t => t)) {
+    svg += `<text x="${W - 2}" y="10" text-anchor="end" font-size="9" fill="var(--orange)">‒ ‒ target</text>`;
   }
   svg += '</svg>';
   document.getElementById('weekChart').innerHTML = svg;
 }
 
 function renderProgress(cal, pro) {
-  const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
-  const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
+  // Judge the viewed day against ITS targets, not today's
+  const t = getTargetsFor(getKeyFor(viewOffset));
   const wrap = document.getElementById('progressWrap');
-  if (!calT && !proT) { wrap.style.display = 'none'; return; }
+  if (!t.cal && !t.pro) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
-  setBar('calRow', 'calFill', 'calLabel', cal, calT);
-  setBar('proRow', 'proFill', 'proLabel', pro, proT);
+  setBar('calRow', 'calFill', 'calLabel', cal, t.cal);
+  setBar('proRow', 'proFill', 'proLabel', pro, t.pro);
 }
 
 function setBar(rowId, fillId, labelId, value, target) {
@@ -1152,16 +1200,11 @@ async function shareCoachingLog(days) {
   const keys = Object.keys(localStorage)
     .filter(k => k.startsWith('macrosnap_log_') && (!cutoff || k >= cutoff))
     .sort();
-  const calT = parseInt(localStorage.getItem('macrosnap_target_cal')) || 0;
-  const proT = parseInt(localStorage.getItem('macrosnap_target_pro')) || 0;
-
   let out = `MacroSnap food log (${days > 0 ? `last ${days} days` : 'full history'})\n`;
-  if (calT || proT) {
-    const t = [];
-    if (calT) t.push(`${calT} cal`);
-    if (proT) t.push(`${proT}g protein`);
-    out += `Daily targets: ${t.join(', ')}\n`;
-  }
+  const wdC = localStorage.getItem('macrosnap_target_cal'), wdP = localStorage.getItem('macrosnap_target_pro');
+  const weC = localStorage.getItem('macrosnap_target_cal_we'), weP = localStorage.getItem('macrosnap_target_pro_we');
+  if (wdC || wdP) out += `Current targets — weekdays: ${wdC || '–'} cal, ${wdP || '–'}g protein; weekends: ${weC || wdC || '–'} cal, ${weP || wdP || '–'}g protein\n`;
+  out += 'Each day below shows the target that was in effect ON that day (goals may have changed over time).\n';
   out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber.\n\n';
 
   let daysOut = 0;
@@ -1181,7 +1224,11 @@ async function shareCoachingLog(days) {
       }
       return line;
     });
-    out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})\n${lines.join('\n')}\n\n`;
+    const dt = getTargetsFor(k);
+    const tgStr = (dt.cal || dt.pro)
+      ? ` [target: ${dt.cal ? dt.cal + ' cal' : ''}${dt.cal && dt.pro ? ', ' : ''}${dt.pro ? dt.pro + 'g protein' : ''}]`
+      : '';
+    out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})${tgStr}\n${lines.join('\n')}\n\n`;
   });
 
   if (daysOut === 0) {
