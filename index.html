@@ -266,6 +266,16 @@
   /* Error */
   .error { background: rgba(248,113,113,0.15); border: 1px solid var(--red); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 14px; color: var(--red); display: none; }
   .error.visible { display: block; }
+
+  /* Notice (success banner) */
+  .notice { background: rgba(74,222,128,0.12); border: 1px solid var(--green); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 14px; color: var(--green); display: none; }
+  .notice.visible { display: block; }
+
+  /* Activity line (Watch data) */
+  .activity-line {
+    background: var(--surface); border-radius: 12px; padding: 12px 14px;
+    margin-bottom: 10px; font-size: 13px; color: var(--text2); text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -333,6 +343,7 @@
 </div>
 
 <div class="error" id="error"></div>
+<div class="notice" id="notice"></div>
 
 <div class="results" id="results">
   <div class="results-card">
@@ -402,6 +413,7 @@
       </div>
     </div>
   </div>
+  <div class="activity-line" id="activityLine" style="display:none;"></div>
   <div id="logEntries"><div class="log-empty">No meals logged yet today</div></div>
   <button class="clear-log" id="clearLogBtn" style="display:none;" onclick="clearLog()">Clear This Day's Log</button>
 </div>
@@ -418,6 +430,7 @@
     <button class="secondary-btn" onclick="shareCoachingLog(EXPORT_DAYS)">📋 Export Last 14 Days</button>
     <button class="secondary-btn" onclick="shareCoachingLog(0)">🗂️ Export All</button>
   </div>
+  <button class="secondary-btn" style="width:100%; margin-top:10px;" onclick="importActivityFromClipboard()">📥 Import Watch Activity (from clipboard)</button>
 </div>
 
 <script>
@@ -1016,6 +1029,55 @@ function saveLogFor(key, log) {
   localStorage.setItem(key, JSON.stringify(log));
 }
 
+// --- Apple Watch activity (ingested via URL from the "MacroSnap Activity" Shortcut) ---
+// URL format: #activity=YYYY-MM-DD,steps,restingHR,exerciseMin,activeEnergy
+// Multiple days may be sent separated by ";".
+function ingestActivityString(str) {
+  let count = 0;
+  String(str).split(/[;\n]+/).forEach(entry => {
+    const p = entry.trim().split(',');
+    if (p.length < 5) return;
+    const date = p[0].trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const nums = p.slice(1, 5).map(v => Math.round(parseFloat(v)) || 0);
+    localStorage.setItem('macrosnap_activity_' + date,
+      JSON.stringify({ steps: nums[0], rhr: nums[1], ex: nums[2], ae: nums[3] }));
+    count++;
+  });
+  return count;
+}
+
+function ingestActivityFromUrl() {
+  const m = location.hash.match(/#activity=(.+)/);
+  if (!m) return;
+  const count = ingestActivityString(decodeURIComponent(m[1]));
+  history.replaceState(null, '', location.pathname + location.search);
+  if (count) showNotice(`✓ Watch activity saved for ${count} day${count > 1 ? 's' : ''}`);
+}
+
+// Clipboard import — the reliable path into the installed home-screen app
+// (iOS gives the PWA separate storage from Safari, so URL delivery can't reach it)
+async function importActivityFromClipboard() {
+  try {
+    const txt = await navigator.clipboard.readText();
+    const count = ingestActivityString(txt || '');
+    if (count) {
+      showNotice(`✓ Watch activity saved for ${count} day${count > 1 ? 's' : ''}`);
+      hideError();
+      renderLog();
+    } else {
+      showError('Clipboard doesn\'t look like activity data. Run the "MacroSnap Activity" Shortcut first (expects: YYYY-MM-DD,steps,RHR,exerciseMin,activeCal).');
+    }
+  } catch {
+    showError('Could not read the clipboard.');
+  }
+}
+
+function getActivityFor(logKey) {
+  try { return JSON.parse(localStorage.getItem(logKey.replace('macrosnap_log_', 'macrosnap_activity_'))); }
+  catch { return null; }
+}
+
 function dayLabel(offset) {
   if (offset === 0) return "Today's Log";
   if (offset === -1) return 'Yesterday';
@@ -1059,6 +1121,16 @@ function renderLog() {
 
   document.getElementById('logTitle').textContent = dayLabel(viewOffset);
   document.getElementById('nextDay').disabled = viewOffset === 0;
+
+  // Watch activity for the viewed day (shows even on days with no meals)
+  const act = getActivityFor(getKeyFor(viewOffset));
+  const actEl = document.getElementById('activityLine');
+  if (act) {
+    actEl.style.display = 'block';
+    actEl.textContent = `👟 ${(act.steps || 0).toLocaleString()} steps · 🔥 ${act.ae || 0} active cal · 🏃 ${act.ex || 0} min exercise · ❤️ ${act.rhr || 0} RHR`;
+  } else {
+    actEl.style.display = 'none';
+  }
 
   if (log.length === 0) {
     container.innerHTML = `<div class="log-empty">No meals logged ${viewOffset === 0 ? 'yet today' : 'this day'}</div>`;
@@ -1197,20 +1269,27 @@ const EXPORT_DAYS = 14;
 
 async function shareCoachingLog(days) {
   const cutoff = days > 0 ? getKeyFor(-(days - 1)) : '';
-  const keys = Object.keys(localStorage)
-    .filter(k => k.startsWith('macrosnap_log_') && (!cutoff || k >= cutoff))
-    .sort();
+  // Union of days with food logs and days with Watch activity
+  const dates = new Set();
+  Object.keys(localStorage).forEach(k => {
+    let d = null;
+    if (k.startsWith('macrosnap_log_')) d = k.slice('macrosnap_log_'.length);
+    else if (k.startsWith('macrosnap_activity_')) d = k.slice('macrosnap_activity_'.length);
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && (!cutoff || 'macrosnap_log_' + d >= cutoff)) dates.add(d);
+  });
+  const keys = [...dates].sort().map(d => 'macrosnap_log_' + d);
   let out = `MacroSnap food log (${days > 0 ? `last ${days} days` : 'full history'})\n`;
   const wdC = localStorage.getItem('macrosnap_target_cal'), wdP = localStorage.getItem('macrosnap_target_pro');
   const weC = localStorage.getItem('macrosnap_target_cal_we'), weP = localStorage.getItem('macrosnap_target_pro_we');
   if (wdC || wdP) out += `Current targets — weekdays: ${wdC || '–'} cal, ${wdP || '–'}g protein; weekends: ${weC || wdC || '–'} cal, ${weP || wdP || '–'}g protein\n`;
   out += 'Each day below shows the target that was in effect ON that day (goals may have changed over time).\n';
-  out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber.\n\n';
+  out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber. RHR=resting heart rate (bpm), from Apple Watch.\n\n';
 
   let daysOut = 0;
   keys.forEach(k => {
     const log = getLogFor(k);
-    if (!log.length) return;
+    const act = getActivityFor(k);
+    if (!log.length && !act) return;
     daysOut++;
     const dateStr = k.replace('macrosnap_log_', '');
     const d = new Date(dateStr + 'T12:00:00');
@@ -1228,7 +1307,16 @@ async function shareCoachingLog(days) {
     const tgStr = (dt.cal || dt.pro)
       ? ` [target: ${dt.cal ? dt.cal + ' cal' : ''}${dt.cal && dt.pro ? ', ' : ''}${dt.pro ? dt.pro + 'g protein' : ''}]`
       : '';
-    out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})${tgStr}\n${lines.join('\n')}\n\n`;
+    if (log.length) {
+      out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})${tgStr}\n`;
+    } else {
+      out += `${label} — no meals logged${tgStr}\n`;
+    }
+    if (act) {
+      out += `  Activity: ${act.steps || 0} steps, ${act.ae || 0} active cal, ${act.ex || 0} exercise min, ${act.rhr || 0} RHR\n`;
+    }
+    if (lines.length) out += lines.join('\n') + '\n';
+    out += '\n';
   });
 
   if (daysOut === 0) {
@@ -1291,8 +1379,15 @@ function clearLog() {
 
 function showError(msg) { const el = document.getElementById('error'); el.textContent = msg; el.classList.add('visible'); }
 function hideError() { document.getElementById('error').classList.remove('visible'); }
+function showNotice(msg) {
+  const el = document.getElementById('notice');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 6000);
+}
 
 // Initial render
+ingestActivityFromUrl(); // pick up #activity= data from the Shortcut, if present
 renderLog();
 renderTemplates();
 
