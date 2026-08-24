@@ -431,7 +431,10 @@
     <button class="secondary-btn" onclick="shareCoachingLog(EXPORT_DAYS)">📋 14 Days</button>
     <button class="secondary-btn" onclick="shareCoachingLog(0)">🗂️ All</button>
   </div>
-  <button class="secondary-btn" style="width:100%; margin-top:10px;" onclick="importActivityFromClipboard()">📥 Import Watch Activity (from clipboard)</button>
+  <div class="action-row" style="margin-top:10px;">
+    <button class="secondary-btn" onclick="importActivityFromClipboard()">📥 Import Activity</button>
+    <button class="secondary-btn" onclick="logWeight()">⚖️ Log Weight</button>
+  </div>
 </div>
 
 <script>
@@ -1083,6 +1086,26 @@ function getActivityFor(logKey) {
   catch { return null; }
 }
 
+// --- Body weight (manual morning entry) ---
+function logWeight() {
+  const key = getKeyFor(0).replace('macrosnap_log_', 'macrosnap_weight_');
+  const existing = localStorage.getItem(key) || '';
+  const w = prompt("Today's weight (lb):", existing);
+  if (w === null) return;
+  const v = parseFloat(w);
+  if (!v || v <= 0 || v > 1500) { showError('Enter a valid weight in pounds.'); return; }
+  const rounded = Math.round(v * 10) / 10;
+  localStorage.setItem(key, String(rounded));
+  showNotice(`✓ Weight logged: ${rounded} lb`);
+  hideError();
+  renderLog();
+}
+
+function getWeightFor(logKey) {
+  const v = parseFloat(localStorage.getItem(logKey.replace('macrosnap_log_', 'macrosnap_weight_')));
+  return v > 0 ? v : null;
+}
+
 function dayLabel(offset) {
   if (offset === 0) return "Today's Log";
   if (offset === -1) return 'Yesterday';
@@ -1127,12 +1150,16 @@ function renderLog() {
   document.getElementById('logTitle').textContent = dayLabel(viewOffset);
   document.getElementById('nextDay').disabled = viewOffset === 0;
 
-  // Watch activity for the viewed day (shows even on days with no meals)
+  // Weight + Watch activity for the viewed day (shows even on days with no meals)
   const act = getActivityFor(getKeyFor(viewOffset));
+  const wt = getWeightFor(getKeyFor(viewOffset));
   const actEl = document.getElementById('activityLine');
-  if (act) {
+  const bits = [];
+  if (wt) bits.push(`⚖️ ${wt} lb`);
+  if (act) bits.push(`👟 ${(act.steps || 0).toLocaleString()} steps · 🔥 ${act.ae || 0} active cal · 🏃 ${act.ex || 0} min exercise · ❤️ ${act.rhr || 0} RHR`);
+  if (bits.length) {
     actEl.style.display = 'block';
-    actEl.textContent = `👟 ${(act.steps || 0).toLocaleString()} steps · 🔥 ${act.ae || 0} active cal · 🏃 ${act.ex || 0} min exercise · ❤️ ${act.rhr || 0} RHR`;
+    actEl.textContent = bits.join(' · ');
   } else {
     actEl.style.display = 'none';
   }
@@ -1280,6 +1307,7 @@ async function shareCoachingLog(days) {
     let d = null;
     if (k.startsWith('macrosnap_log_')) d = k.slice('macrosnap_log_'.length);
     else if (k.startsWith('macrosnap_activity_')) d = k.slice('macrosnap_activity_'.length);
+    else if (k.startsWith('macrosnap_weight_')) d = k.slice('macrosnap_weight_'.length);
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && (!cutoff || 'macrosnap_log_' + d >= cutoff)) dates.add(d);
   });
   const keys = [...dates].sort().map(d => 'macrosnap_log_' + d);
@@ -1294,7 +1322,8 @@ async function shareCoachingLog(days) {
   keys.forEach(k => {
     const log = getLogFor(k);
     const act = getActivityFor(k);
-    if (!log.length && !act) return;
+    const wt = getWeightFor(k);
+    if (!log.length && !act && !wt) return;
     daysOut++;
     const dateStr = k.replace('macrosnap_log_', '');
     const d = new Date(dateStr + 'T12:00:00');
@@ -1316,6 +1345,9 @@ async function shareCoachingLog(days) {
       out += `${label} — total ${tCal} cal (C${tC} P${tP} F${tF} Fb${tFb})${tgStr}\n`;
     } else {
       out += `${label} — no meals logged${tgStr}\n`;
+    }
+    if (wt) {
+      out += `  Weight: ${wt} lb\n`;
     }
     if (act) {
       out += `  Activity: ${act.steps || 0} steps, ${act.ae || 0} active cal, ${act.ex || 0} exercise min, ${act.rhr || 0} RHR\n`;
