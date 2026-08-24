@@ -427,8 +427,9 @@
   </div>
   <div id="weekChart"></div>
   <div class="action-row" style="margin-top:12px;">
-    <button class="secondary-btn" onclick="shareCoachingLog(EXPORT_DAYS)">📋 Export Last 14 Days</button>
-    <button class="secondary-btn" onclick="shareCoachingLog(0)">🗂️ Export All</button>
+    <button class="secondary-btn" onclick="shareCoachingLog(7)">📋 7 Days</button>
+    <button class="secondary-btn" onclick="shareCoachingLog(EXPORT_DAYS)">📋 14 Days</button>
+    <button class="secondary-btn" onclick="shareCoachingLog(0)">🗂️ All</button>
   </div>
   <button class="secondary-btn" style="width:100%; margin-top:10px;" onclick="importActivityFromClipboard()">📥 Import Watch Activity (from clipboard)</button>
 </div>
@@ -485,8 +486,8 @@ Respond ONLY with valid JSON in this exact format, no markdown, no code fences:
   "fiber_g": 8,
   "confidence": "medium",
   "items": [
-    {"name": "Item 1", "calories": 250},
-    {"name": "Item 2", "calories": 250}
+    {"name": "Item 1", "calories": 250, "fat_g": 12},
+    {"name": "Item 2", "calories": 250, "fat_g": 3}
   ]
 }
 
@@ -496,7 +497,7 @@ Rules:
 - Brightly colored solid-tone plates with concentric rings are Fiesta dinnerware: dinner plates are 26.7 cm in diameter, smaller luncheon plates are 22.9 cm
 - "confidence" must be "high", "medium", or "low"
 - "fiber_g" is dietary fiber in grams
-- Break down individual items when possible
+- Break down individual items when possible, including each item's fat grams ("fat_g")
 - If you cannot identify the food (or the description is too vague), return: {"error": "Could not identify the food"}
 - All numbers should be integers`;
 }
@@ -612,7 +613,11 @@ function scaleResult(r, f) {
     protein_g: Math.round((r.protein_g || 0) * f),
     fat_g: Math.round((r.fat_g || 0) * f),
     fiber_g: Math.round((r.fiber_g || 0) * f),
-    items: (r.items || []).map(i => ({ ...i, calories: Math.round((i.calories || 0) * f) }))
+    items: (r.items || []).map(i => {
+      const s = { ...i, calories: Math.round((i.calories || 0) * f) };
+      if (i.fat_g != null) s.fat_g = Math.round(i.fat_g * f);
+      return s;
+    })
   };
 }
 
@@ -638,7 +643,7 @@ function setPortion(f) {
       e.protein = scaled.protein_g;
       e.fat = scaled.fat_g;
       e.fiber = scaled.fiber_g;
-      e.items = (scaled.items || []).map(i => ({ name: i.name, calories: i.calories }));
+      e.items = (scaled.items || []).map(i => ({ name: i.name, calories: i.calories, fat: i.fat_g }));
       saveLogFor(key, log);
       renderLog();
     }
@@ -795,7 +800,7 @@ function displayResults(r) {
   const list = document.getElementById('itemsList');
   if (r.items && r.items.length > 0) {
     list.innerHTML = '<h3>Breakdown</h3>' + r.items.map(i =>
-      `<div class="food-item"><span class="food-item-name">${esc(i.name)}</span><span class="food-item-cals">${esc(i.calories)} cal</span></div>`
+      `<div class="food-item"><span class="food-item-name">${esc(i.name)}</span><span class="food-item-cals">${esc(i.calories)} cal${i.fat_g != null ? ' · ' + esc(i.fat_g) + 'g fat' : ''}</span></div>`
     ).join('');
   } else {
     list.innerHTML = '';
@@ -1103,7 +1108,7 @@ function addToLog(result) {
     protein: result.protein_g,
     fat: result.fat_g,
     fiber: result.fiber_g ?? 0,
-    items: (result.items || []).map(i => ({ name: i.name, calories: i.calories })),
+    items: (result.items || []).map(i => ({ name: i.name, calories: i.calories, fat: i.fat_g })),
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveLogFor(key, log);
@@ -1299,7 +1304,7 @@ async function shareCoachingLog(days) {
       tCal += e.calories; tC += e.carbs; tP += e.protein; tF += e.fat; tFb += e.fiber || 0;
       let line = `- ${e.time} ${e.name}: ${e.calories} cal (C${e.carbs} P${e.protein} F${e.fat} Fb${e.fiber || 0})`;
       if (e.items && e.items.length > 1) {
-        line += '\n' + e.items.map(i => `    · ${i.name}: ${i.calories} cal`).join('\n');
+        line += '\n' + e.items.map(i => `    · ${i.name}: ${i.calories} cal${i.fat != null ? ` (${i.fat}g fat)` : ''}`).join('\n');
       }
       return line;
     });
