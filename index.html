@@ -434,6 +434,7 @@
   <div class="action-row" style="margin-top:10px;">
     <button class="secondary-btn" onclick="importActivityFromClipboard()">📥 Import Activity</button>
     <button class="secondary-btn" onclick="logWeight()">⚖️ Log Weight</button>
+    <button class="secondary-btn" onclick="logTreadmill()">🚶 Treadmill km</button>
   </div>
 </div>
 
@@ -1101,6 +1102,40 @@ function logWeight() {
   renderLog();
 }
 
+// --- Desk treadmill (manual km entry) ---
+// Stored per day as macrosnap_treadmill_YYYY-MM-DD = km (2 decimals).
+// Logs to the day being VIEWED (so yesterday can be back-filled with ‹).
+// Plain number ADDS a session to the day; "=3.2" sets the day's total; "=0" clears it.
+function logTreadmill() {
+  const key = getKeyFor(viewOffset).replace('macrosnap_log_', 'macrosnap_treadmill_');
+  const cur = parseFloat(localStorage.getItem(key)) || 0;
+  const dayName = viewOffset === 0 ? 'today' : dayLabel(viewOffset);
+  const input = prompt(
+    `Desk treadmill km to ADD for ${dayName} (so far: ${cur} km).\n` +
+    `To replace the day's total instead, type = first (e.g. =3.2). =0 clears.`, '');
+  if (input === null) return;
+  const t = input.trim();
+  const isSet = t.startsWith('=');
+  const v = parseFloat(isSet ? t.slice(1) : t);
+  if (isNaN(v) || v < 0 || v > 100) { showError('Enter km walked, e.g. 2.5 (or =2.5 to set the total).'); return; }
+  const total = Math.round((isSet ? v : cur + v) * 100) / 100;
+  if (total <= 0) {
+    localStorage.removeItem(key);
+    showNotice(`✓ Treadmill cleared for ${dayName}`);
+  } else {
+    localStorage.setItem(key, String(total));
+    showNotice(isSet ? `✓ Treadmill total for ${dayName}: ${total} km`
+                     : `✓ Added ${v} km — ${dayName} total: ${total} km`);
+  }
+  hideError();
+  renderLog();
+}
+
+function getTreadmillFor(logKey) {
+  const v = parseFloat(localStorage.getItem(logKey.replace('macrosnap_log_', 'macrosnap_treadmill_')));
+  return v > 0 ? v : null;
+}
+
 function getWeightFor(logKey) {
   const v = parseFloat(localStorage.getItem(logKey.replace('macrosnap_log_', 'macrosnap_weight_')));
   return v > 0 ? v : null;
@@ -1153,9 +1188,11 @@ function renderLog() {
   // Weight + Watch activity for the viewed day (shows even on days with no meals)
   const act = getActivityFor(getKeyFor(viewOffset));
   const wt = getWeightFor(getKeyFor(viewOffset));
+  const tm = getTreadmillFor(getKeyFor(viewOffset));
   const actEl = document.getElementById('activityLine');
   const bits = [];
   if (wt) bits.push(`⚖️ ${wt} lb`);
+  if (tm) bits.push(`🚶 ${tm} km desk treadmill`);
   if (act) bits.push(`👟 ${(act.steps || 0).toLocaleString()} steps · 🔥 ${act.ae || 0} active cal · 🏃 ${act.ex || 0} min exercise · ❤️ ${act.rhr || 0} RHR`);
   if (bits.length) {
     actEl.style.display = 'block';
@@ -1308,6 +1345,7 @@ async function shareCoachingLog(days) {
     if (k.startsWith('macrosnap_log_')) d = k.slice('macrosnap_log_'.length);
     else if (k.startsWith('macrosnap_activity_')) d = k.slice('macrosnap_activity_'.length);
     else if (k.startsWith('macrosnap_weight_')) d = k.slice('macrosnap_weight_'.length);
+    else if (k.startsWith('macrosnap_treadmill_')) d = k.slice('macrosnap_treadmill_'.length);
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && (!cutoff || 'macrosnap_log_' + d >= cutoff)) dates.add(d);
   });
   const keys = [...dates].sort().map(d => 'macrosnap_log_' + d);
@@ -1316,14 +1354,21 @@ async function shareCoachingLog(days) {
   const weC = localStorage.getItem('macrosnap_target_cal_we'), weP = localStorage.getItem('macrosnap_target_pro_we');
   if (wdC || wdP) out += `Current targets — weekdays: ${wdC || '–'} cal, ${wdP || '–'}g protein; weekends: ${weC || wdC || '–'} cal, ${weP || wdP || '–'}g protein\n`;
   out += 'Each day below shows the target that was in effect ON that day (goals may have changed over time).\n';
-  out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber. RHR=resting heart rate (bpm), from Apple Watch.\n\n';
+  out += 'Units: grams. C=carbs, P=protein, F=fat, Fb=fiber. RHR=resting heart rate (bpm), from Apple Watch.\n';
+  out += 'Desk treadmill: "Treadmill: X km" lines are entered by hand and mark days with extra walking at a standing/walking desk. ' +
+    'DOUBLE-COUNT WARNING: the Apple Watch "Activity" steps and active cal for that same day may already include SOME of this walking — ' +
+    'but usually not all, because hands resting on the desk/keyboard keep the wrist still and the Watch undercounts steps. ' +
+    'Do not add a full treadmill burn on top of Watch active cal. To judge overlap: treadmill walking ≈ 1,300 steps/km; if that day\'s ' +
+    'steps are above a typical non-treadmill day by roughly km × 1,300, treat it as already counted; if not, credit only the uncounted part. ' +
+    'Net walking cost ≈ 0.5 kcal per kg body weight per km (use the logged weight). Treadmill-only days are still real activity days.\n\n';
 
   let daysOut = 0;
   keys.forEach(k => {
     const log = getLogFor(k);
     const act = getActivityFor(k);
     const wt = getWeightFor(k);
-    if (!log.length && !act && !wt) return;
+    const tm = getTreadmillFor(k);
+    if (!log.length && !act && !wt && !tm) return;
     daysOut++;
     const dateStr = k.replace('macrosnap_log_', '');
     const d = new Date(dateStr + 'T12:00:00');
@@ -1348,6 +1393,9 @@ async function shareCoachingLog(days) {
     }
     if (wt) {
       out += `  Weight: ${wt} lb\n`;
+    }
+    if (tm) {
+      out += `  Treadmill: ${tm} km (desk treadmill, manual entry — may partly overlap Watch steps)\n`;
     }
     if (act) {
       out += `  Activity: ${act.steps || 0} steps, ${act.ae || 0} active cal, ${act.ex || 0} exercise min, ${act.rhr || 0} RHR\n`;
